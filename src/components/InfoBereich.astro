@@ -146,11 +146,30 @@
 
   openBtn?.addEventListener('click', () => {
     setInfoMode(activeTab());
-    dialog?.showModal();
+    if (!dialog?.open) {
+      dialog?.showModal();
+      requestAnimationFrame(() => dialog?.classList.add('is-open'));
+    }
   });
-  closeBtn?.addEventListener('click', () => dialog?.close());
+
+  function closeDialog() {
+    if (!dialog?.open || dialog.classList.contains('is-closing')) return;
+
+    dialog.classList.remove('is-open');
+    dialog.classList.add('is-closing');
+    window.setTimeout(() => {
+      dialog.close();
+      dialog.classList.remove('is-closing');
+    }, 220);
+  }
+
+  closeBtn?.addEventListener('click', closeDialog);
   dialog?.addEventListener('click', (event) => {
-    if (event.target === dialog) dialog.close();
+    if (event.target === dialog) closeDialog();
+  });
+  dialog?.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    closeDialog();
   });
 
   document.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((tab) => {
@@ -200,6 +219,54 @@
 
   .regel-dialog::backdrop {
     backdrop-filter: blur(3px);
+  }
+
+  .regel-dialog {
+    position: fixed;
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    width: min(calc(100dvw - 2rem), 42rem);
+    max-height: min(calc(100dvh - 2rem), 760px);
+    margin: 0;
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 18px)) scale(0.96);
+    transition:
+      opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: opacity, transform;
+  }
+
+  .regel-dialog.is-open {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  .regel-dialog.is-closing {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 10px)) scale(0.98);
+  }
+
+  .regel-dialog::backdrop {
+    opacity: 0;
+    transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .regel-dialog.is-open::backdrop {
+    opacity: 1;
+  }
+
+  .regel-dialog.is-closing::backdrop {
+    opacity: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .regel-dialog,
+    .regel-dialog::backdrop {
+      transition: none;
+      will-change: auto;
+    }
   }
 
   .dialog-close {

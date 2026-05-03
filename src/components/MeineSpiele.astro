@@ -42,17 +42,34 @@ const spielerNamen = Array.from(new Set([...einzelSpieler, ...doppelSpieler])).s
 const spielerLinks = spielerNamen.map((name) => ({ name, slug: slugifyPlayer(name) }));
 ---
 
-<section class="mb-4 overflow-hidden rounded-sm border border-deep-ink/10 bg-white/55 backdrop-blur-sm sm:mb-6">
-  <details class="player-details" data-player-details>
-    <summary class="player-summary">
-      <span>
-        <span class="label-mono block text-club-blue">Meine Spiele</span>
-        <span class="mt-1 block text-sm leading-tight text-muted">Spieler suchen und persönlichen Spielplan anzeigen</span>
-      </span>
-      <span class="player-summary-mark" aria-hidden="true"></span>
-    </summary>
+<section class="mb-4 sm:mb-6" aria-label="Persönlicher Spielplan">
+  <button type="button" class="player-open-button w-full" data-player-open>
+    <span>
+      <span class="label-mono block text-club-blue">Meine Spiele</span>
+      <span class="mt-1 block font-serif text-xl leading-none">Persönlicher Spielplan</span>
+      <span class="mt-1.5 block text-sm leading-tight text-muted">Spieler suchen und Matches anzeigen</span>
+    </span>
+    <span class="player-open-mark" aria-hidden="true"></span>
+  </button>
+</section>
 
-    <div class="border-t border-deep-ink/10 px-3 py-3 sm:px-6 sm:py-4">
+<dialog class="player-dialog w-[calc(100%-2rem)] max-w-2xl rounded-sm border border-deep-ink/15 bg-warm-sand p-0 text-deep-ink shadow-[0_24px_70px_-36px_rgba(26,31,46,0.45)] backdrop:bg-deep-ink/45" data-player-dialog>
+  <div class="border-b border-deep-ink/10 px-4 py-4 sm:px-6">
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <div class="label-mono text-club-blue">Meine Spiele</div>
+        <h2 class="mt-1 font-serif text-2xl leading-tight sm:text-3xl">
+          Persönlicher Spielplan
+        </h2>
+      </div>
+      <button type="button" class="player-dialog-close" data-player-close aria-label="Meine Spiele schliessen">
+        <span aria-hidden="true">×</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="max-h-[min(74dvh,640px)] overflow-y-auto">
+    <div class="px-4 py-4 sm:px-6 sm:py-5">
       <div class="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
         <label class="block">
           <span class="label-mono mb-1.5 block text-muted-2">Spieler suchen</span>
@@ -72,19 +89,21 @@ const spielerLinks = spielerNamen.map((name) => ({ name, slug: slugifyPlayer(nam
       </datalist>
     </div>
 
-    <div class="border-t border-deep-ink/10 px-3 py-3 sm:px-6 sm:py-4" data-player-results>
+    <div class="border-t border-deep-ink/10 px-4 py-4 sm:px-6 sm:py-5" data-player-results>
       <p class="text-sm leading-relaxed text-muted">
         Wähle einen Spieler aus, um alle Einzel- und Doppelmatches dieses Spielers zu sehen.
       </p>
     </div>
-  </details>
-</section>
+  </div>
+</dialog>
 
 <script define:vars={{ einzelMatches, doppelMatches, spielerLinks }}>
   const input = document.querySelector('[data-player-search]');
   const clearBtn = document.querySelector('[data-player-clear]');
   const results = document.querySelector('[data-player-results]');
-  const details = document.querySelector('[data-player-details]');
+  const openBtn = document.querySelector('[data-player-open]');
+  const closeBtn = document.querySelector('[data-player-close]');
+  const dialog = document.querySelector('[data-player-dialog]');
 
   function doppelPlayers(doppel) {
     return doppel ? doppel.split('/').map((p) => p.trim()) : [];
@@ -197,13 +216,39 @@ const spielerLinks = spielerNamen.map((name) => ({ name, slug: slugifyPlayer(nam
     render();
     input.focus();
   });
-  details?.addEventListener('toggle', () => {
-    if (details.open) input?.focus();
+
+  function openDialog() {
+    if (!dialog?.open) {
+      dialog?.showModal();
+      requestAnimationFrame(() => dialog?.classList.add('is-open'));
+    }
+    window.setTimeout(() => input?.focus(), 120);
+  }
+
+  function closeDialog() {
+    if (!dialog?.open || dialog.classList.contains('is-closing')) return;
+
+    dialog.classList.remove('is-open');
+    dialog.classList.add('is-closing');
+    window.setTimeout(() => {
+      dialog.close();
+      dialog.classList.remove('is-closing');
+    }, 220);
+  }
+
+  openBtn?.addEventListener('click', openDialog);
+  closeBtn?.addEventListener('click', closeDialog);
+  dialog?.addEventListener('click', (event) => {
+    if (event.target === dialog) closeDialog();
+  });
+  dialog?.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    closeDialog();
   });
 </script>
 
 <style>
-  .player-summary {
+  .player-open-button {
     cursor: pointer;
     display: flex;
     min-height: 62px;
@@ -211,22 +256,52 @@ const spielerLinks = spielerNamen.map((name) => ({ name, slug: slugifyPlayer(nam
     justify-content: space-between;
     gap: 1rem;
     padding: 0.85rem 0.9rem 0.85rem 1rem;
-    list-style: none;
+    border: 1px solid rgba(26, 31, 46, 0.12);
+    border-radius: 4px;
+    color: var(--color-deep-ink);
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.42)),
+      rgba(255, 255, 255, 0.45);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.58),
+      0 12px 32px -28px rgba(26, 31, 46, 0.85);
+    text-align: left;
+    backdrop-filter: blur(10px);
+    transition:
+      transform 0.18s ease,
+      border-color 0.18s ease,
+      background-color 0.18s ease,
+      box-shadow 0.18s ease;
   }
-  .player-summary::-webkit-details-marker {
-    display: none;
+  .player-open-button:hover {
+    border-color: rgba(26, 31, 46, 0.28);
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.54)),
+      rgba(255, 255, 255, 0.62);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.7),
+      0 18px 38px -30px rgba(26, 31, 46, 0.95);
+  }
+  .player-open-button:active {
+    transform: translateY(1px);
   }
 
-  .player-summary-mark {
+  .player-open-mark {
     position: relative;
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     flex: 0 0 auto;
-    border: 1px solid rgba(26, 31, 46, 0.16);
+    border: 1px solid rgba(26, 31, 46, 0.2);
     border-radius: 999px;
+    background: rgba(26, 139, 199, 0.1);
+    transition: transform 0.18s ease, background-color 0.18s ease;
   }
-  .player-summary-mark::before,
-  .player-summary-mark::after {
+  .player-open-button:hover .player-open-mark {
+    background: rgba(26, 139, 199, 0.16);
+    transform: translateX(2px);
+  }
+  .player-open-mark::before,
+  .player-open-mark::after {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -236,12 +311,57 @@ const spielerLinks = spielerNamen.map((name) => ({ name, slug: slugifyPlayer(nam
     content: "";
     transform: translate(-50%, -50%);
   }
-  .player-summary-mark::after {
+  .player-open-mark::after {
     transform: translate(-50%, -50%) rotate(90deg);
-    transition: opacity 0.18s ease;
   }
-  .player-details[open] .player-summary-mark::after {
+
+  .player-dialog {
+    position: fixed;
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    width: min(calc(100dvw - 2rem), 42rem);
+    max-height: min(calc(100dvh - 2rem), 760px);
+    margin: 0;
     opacity: 0;
+    transform: translate(-50%, calc(-50% + 18px)) scale(0.96);
+    transition:
+      opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: opacity, transform;
+  }
+
+  .player-dialog.is-open {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  .player-dialog.is-closing {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 10px)) scale(0.98);
+  }
+
+  .player-dialog::backdrop {
+    opacity: 0;
+    backdrop-filter: blur(3px);
+    transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .player-dialog.is-open::backdrop {
+    opacity: 1;
+  }
+
+  .player-dialog.is-closing::backdrop {
+    opacity: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .player-dialog,
+    .player-dialog::backdrop {
+      transition: none;
+      will-change: auto;
+    }
   }
 
   .player-search {
@@ -275,6 +395,28 @@ const spielerLinks = spielerNamen.map((name) => ({ name, slug: slugifyPlayer(nam
     background: transparent;
   }
   .clear-player:active {
+    transform: translateY(1px);
+  }
+
+  .player-dialog-close {
+    cursor: pointer;
+    display: grid;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid rgba(26, 31, 46, 0.15);
+    border-radius: 4px;
+    color: var(--color-deep-ink);
+    background: transparent;
+    font-size: 24px;
+    line-height: 1;
+    transition: transform 0.18s ease, border-color 0.18s ease;
+  }
+  .player-dialog-close:hover {
+    border-color: var(--color-deep-ink);
+  }
+  .player-dialog-close:active {
     transform: translateY(1px);
   }
 
