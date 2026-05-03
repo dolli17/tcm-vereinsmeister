@@ -1,0 +1,54 @@
+name: Deploy Vereinsmeisterschaft
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-vm
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass rsync
+
+      - name: Deploy via rsync
+        env:
+          RAW_PASSWORD: ${{ secrets.IONOS_SSH_PASSWORD }}
+          RAW_USER: ${{ secrets.IONOS_SSH_USER }}
+          RAW_HOST: ${{ secrets.IONOS_SSH_HOST }}
+          SSH_TARGET: /homepages/45/d269169139/htdocs/preview/vm/
+        run: |
+          SSHPASS=$(printf '%s' "$RAW_PASSWORD" | tr -d '\r\n' | sed 's/[[:space:]]*$//')
+          SSH_USER=$(printf '%s' "$RAW_USER" | tr -d '\r\n' | sed 's/[[:space:]]*$//')
+          SSH_HOST=$(printf '%s' "$RAW_HOST" | tr -d '\r\n' | sed 's/[[:space:]]*$//')
+          export SSHPASS
+
+          echo "::add-mask::$SSHPASS"
+          echo "Password length: ${#SSHPASS}"
+          echo "User length: ${#SSH_USER}, Host length: ${#SSH_HOST}"
+
+          sshpass -e rsync -avz --delete \
+            -e "ssh -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null" \
+            dist/ "$SSH_USER@$SSH_HOST:$SSH_TARGET"

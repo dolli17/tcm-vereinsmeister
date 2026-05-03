@@ -1,0 +1,35 @@
+---
+import { getAllMatches, isMatchPlayed } from '../lib/standings';
+
+const all = getAllMatches();
+const total = all.length;
+const gespielt = all.filter(isMatchPlayed).length;
+---
+
+<header class="border-b border-deep-ink/10 bg-warm-sand">
+  <div class="mx-auto max-w-5xl px-4 pt-7 pb-6 sm:px-8 sm:pt-14 sm:pb-9">
+    <div class="flex items-start justify-between gap-4">
+      <div class="min-w-0">
+        <div class="label-mono text-club-blue">TC Muckensturm · Saison 2026</div>
+        <h1 class="mt-2 max-w-[10ch] font-serif text-[44px] leading-[0.94] text-deep-ink sm:max-w-none sm:text-5xl">
+          Vereins&shy;meisterschaft
+        </h1>
+      </div>
+
+      <div class="hidden border-l border-deep-ink/12 pl-4 text-right sm:block">
+        <div class="label-mono text-muted-2">Spiele</div>
+        <div class="mt-1 font-mono text-sm tabular-nums text-deep-ink">{gespielt}/{total}</div>
+      </div>
+    </div>
+
+    <div class="mt-5 grid gap-3 border-t border-deep-ink/10 pt-4 sm:mt-6 sm:grid-cols-[1fr_auto] sm:items-end">
+      <p class="max-w-2xl text-[15px] leading-relaxed text-muted sm:text-lg">
+        Live-Tabellen, Spielplan und Ergebnisse von Mai bis September.
+      </p>
+      <div class="flex items-center justify-between gap-3 rounded-sm border border-deep-ink/10 bg-white/35 px-3 py-2 sm:hidden">
+        <span class="label-mono text-muted-2">Spiele</span>
+        <span class="font-mono text-sm tabular-nums text-deep-ink">{gespielt}/{total}</span>
+      </div>
+    </div>
+  </div>
+</header>

@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@import "@fontsource/instrument-serif/400.css";
+@import "@fontsource/instrument-serif/400-italic.css";
+@import "@fontsource-variable/geist";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+@theme {
+  --color-club-blue: #1a8bc7;
+  --color-ball-yellow: #e8c93a;
+  --color-court-red: #c8623c;
+  --color-warm-sand: #f5efe6;
+  --color-warm-sand-2: #d4ccbf;
+  --color-deep-ink: #1a1f2e;
+  --color-muted: #4a4e5a;
+  --color-muted-2: #6a6e7a;
+
+  --font-serif: 'Instrument Serif', Georgia, serif;
+  --font-sans: 'Geist Variable', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+html {
+  font-family: var(--font-sans);
+  color: var(--color-deep-ink);
+  background: var(--color-warm-sand);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+.label-mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

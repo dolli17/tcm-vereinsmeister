@@ -1,0 +1,46 @@
+{
+  "einzel": [
+    { "name": "Patrick Strohm", "gruppe": 1, "gesetzt": true },
+    { "name": "Nicolas Vogel", "gruppe": 1, "gesetzt": false },
+    { "name": "Ladislav Virag", "gruppe": 1, "gesetzt": false },
+    { "name": "Gregor Skatulla", "gruppe": 1, "gesetzt": false },
+
+    { "name": "Frieder King", "gruppe": 2, "gesetzt": true },
+    { "name": "Patrick Wiemann", "gruppe": 2, "gesetzt": false },
+    { "name": "Robin Heinzler", "gruppe": 2, "gesetzt": false },
+    { "name": "Julian Völker", "gruppe": 2, "gesetzt": false },
+    { "name": "Wolfgang Putschky", "gruppe": 2, "gesetzt": false },
+
+    { "name": "Chris Fiedler", "gruppe": 3, "gesetzt": true },
+    { "name": "Markus Ackermann", "gruppe": 3, "gesetzt": false },
+    { "name": "Branimir Sunjic", "gruppe": 3, "gesetzt": false },
+    { "name": "Roland Tepfenhart", "gruppe": 3, "gesetzt": false },
+
+    { "name": "Moritz Schich", "gruppe": 4, "gesetzt": true },
+    { "name": "Max Böhme", "gruppe": 4, "gesetzt": false },
+    { "name": "Artur Brauer", "gruppe": 4, "gesetzt": false },
+    { "name": "Jakob Steinle", "gruppe": 4, "gesetzt": false },
+
+    { "name": "Lucas Dollmann", "gruppe": 5, "gesetzt": true },
+    { "name": "Adamson E.", "gruppe": 5, "gesetzt": false },
+    { "name": "Andreas Vogel", "gruppe": 5, "gesetzt": false },
+    { "name": "Nick Kindermann", "gruppe": 5, "gesetzt": false },
+    { "name": "Leonel G.", "gruppe": 5, "gesetzt": false },
+
+    { "name": "Amar Loncarevic", "gruppe": 6, "gesetzt": true },
+    { "name": "Tom Kindermann", "gruppe": 6, "gesetzt": false },
+    { "name": "Kai Fischer", "gruppe": 6, "gesetzt": false },
+    { "name": "Lorenz King", "gruppe": 6, "gesetzt": false },
+
+    { "name": "Tim Schaich", "gruppe": 7, "gesetzt": true },
+    { "name": "Tim Strohm", "gruppe": 7, "gesetzt": false },
+    { "name": "Carsten Rose", "gruppe": 7, "gesetzt": false },
+    { "name": "Adel Thaaer", "gruppe": 7, "gesetzt": false },
+    { "name": "Maximilian Fischer", "gruppe": 7, "gesetzt": false },
+
+    { "name": "Louis Cieplik", "gruppe": 8, "gesetzt": true },
+    { "name": "Louis Manos", "gruppe": 8, "gesetzt": false },
+    { "name": "Jochen Eiden", "gruppe": 8, "gesetzt": false },
+    { "name": "Nick Klenk", "gruppe": 8, "gesetzt": false }
+  ]
+}

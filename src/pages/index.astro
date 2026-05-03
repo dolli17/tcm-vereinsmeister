@@ -1,0 +1,183 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Header from '../components/Header.astro';
+import InfoBereich from '../components/InfoBereich.astro';
+import MeineSpiele from '../components/MeineSpiele.astro';
+import GruppenCard from '../components/GruppenCard.astro';
+import DoppelView from '../components/DoppelView.astro';
+import { getGruppen } from '../lib/standings';
+
+const gruppen = getGruppen();
+const monate = ['Alle', 'Mai', 'Juni', 'Juli'] as const;
+const stati = ['Alle', 'Offen', 'Terminiert', 'Gespielt'] as const;
+---
+
+<Layout>
+  <Header />
+
+  <nav class="sticky top-0 z-20 border-b border-deep-ink/10 bg-warm-sand/95 shadow-[0_8px_24px_-22px_rgba(26,31,46,0.65)] backdrop-blur-sm">
+    <div class="mx-auto max-w-5xl px-4 sm:px-8">
+      <div role="tablist" aria-label="Konkurrenzen" class="grid grid-cols-2 gap-1 pt-2 sm:flex sm:pt-3">
+        <button type="button" role="tab" aria-selected="true" data-tab="einzel" class="cta-tab is-active">
+          Herren Einzel
+        </button>
+        <button type="button" role="tab" aria-selected="false" data-tab="doppel" class="cta-tab">
+          Herren Doppel
+        </button>
+      </div>
+
+      <div class="grid gap-2 py-2.5 sm:py-3">
+        <div data-monat-filter-bar class="-mx-1 flex gap-1 overflow-x-auto no-scrollbar">
+          {monate.map((m) => (
+            <button type="button" data-monat-filter={m} class={`cta-filter ${m === 'Alle' ? 'is-active' : ''}`}>
+              {m}
+            </button>
+          ))}
+        </div>
+
+        <div data-status-filter-bar class="-mx-1 flex gap-1 overflow-x-auto no-scrollbar">
+          {stati.map((s) => (
+            <button type="button" data-status-filter={s.toLowerCase()} class={`cta-filter ${s === 'Alle' ? 'is-active' : ''}`}>
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="mx-auto max-w-5xl px-4 py-5 sm:px-8 sm:py-10">
+    <InfoBereich />
+    <MeineSpiele />
+
+    <section data-tabpanel="einzel" class="space-y-5 sm:space-y-6">
+      {gruppen.map((g) => <GruppenCard gruppe={g} />)}
+    </section>
+
+    <section data-tabpanel="doppel" hidden>
+      <DoppelView />
+    </section>
+
+    <footer class="mt-12 border-t border-deep-ink/10 pt-6 text-center">
+      <div class="label-mono text-muted-2">TC Muckensturm</div>
+      <p class="mt-2 font-mono text-[11px] text-muted-2">
+        Tippfehler im Ergebnis? Sportwart kontaktieren.
+      </p>
+    </footer>
+  </main>
+
+  <script>
+    const tabs = document.querySelectorAll<HTMLButtonElement>('[data-tab]');
+    const panels = document.querySelectorAll<HTMLElement>('[data-tabpanel]');
+    const monatFilterBar = document.querySelector<HTMLElement>('[data-monat-filter-bar]');
+    tabs.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.tab;
+        tabs.forEach((b) => {
+          const active = b === btn;
+          b.classList.toggle('is-active', active);
+          b.setAttribute('aria-selected', String(active));
+        });
+        panels.forEach((p) => {
+          p.hidden = p.dataset.tabpanel !== target;
+        });
+        if (monatFilterBar) monatFilterBar.hidden = target === 'doppel';
+      });
+    });
+
+    const monatBtns = document.querySelectorAll<HTMLButtonElement>('[data-monat-filter]');
+    const statusBtns = document.querySelectorAll<HTMLButtonElement>('[data-status-filter]');
+    let activeMonat = 'Alle';
+    let activeStatus = 'alle';
+
+    function applyMatchFilters() {
+      document.querySelectorAll<HTMLElement>('[data-match-row]').forEach((row) => {
+        const monthOk = activeMonat === 'Alle' || !row.dataset.monat || row.dataset.monat === activeMonat;
+        const statusOk = activeStatus === 'alle' || row.dataset.status === activeStatus;
+        row.hidden = !(monthOk && statusOk);
+      });
+
+      document.querySelectorAll<HTMLElement>('[data-monat]').forEach((section) => {
+        const rows = Array.from(section.querySelectorAll<HTMLElement>('[data-match-row]'));
+        section.hidden = rows.length > 0 && rows.every((row) => row.hidden);
+      });
+    }
+
+    monatBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        activeMonat = btn.dataset.monatFilter ?? 'Alle';
+        monatBtns.forEach((b) => b.classList.toggle('is-active', b === btn));
+        applyMatchFilters();
+      });
+    });
+
+    statusBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        activeStatus = btn.dataset.statusFilter ?? 'alle';
+        statusBtns.forEach((b) => b.classList.toggle('is-active', b === btn));
+        applyMatchFilters();
+      });
+    });
+  </script>
+
+  <style>
+    .cta-tab {
+      cursor: pointer;
+      min-height: 40px;
+      padding: 0.625rem 0.55rem;
+      border: 1px solid rgba(26, 31, 46, 0.12);
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 1.1px;
+      line-height: 1.1;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      background: transparent;
+      transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+    }
+    .cta-tab:hover { color: var(--color-deep-ink); }
+    .cta-tab.is-active {
+      color: var(--color-deep-ink);
+      background: var(--color-warm-sand-2);
+      border-color: rgba(26, 31, 46, 0.1);
+    }
+    @media (min-width: 640px) {
+      .cta-tab {
+        min-height: 0;
+        padding: 0.75rem 1.25rem;
+        border-bottom: none;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        font-size: 12px;
+        letter-spacing: 1.4px;
+      }
+    }
+
+    .cta-filter {
+      cursor: pointer;
+      flex-shrink: 0;
+      min-height: 34px;
+      padding: 0.55rem 0.85rem;
+      margin: 0 0.125rem;
+      border: 1px solid rgba(26, 31, 46, 0.15);
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 1.2px;
+      line-height: 1;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      background: transparent;
+      transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+    }
+    .cta-filter:hover { color: var(--color-deep-ink); border-color: var(--color-deep-ink); }
+    .cta-filter.is-active {
+      color: #fff;
+      background: var(--color-deep-ink);
+      border-color: var(--color-deep-ink);
+    }
+  </style>
+</Layout>

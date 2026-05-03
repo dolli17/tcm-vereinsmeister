@@ -1,0 +1,215 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import {
+  getAllPlayerNames,
+  getDoppelTeam,
+  getPlayerBySlug,
+  getPlayerStats,
+  slugifyPlayer,
+} from '../../lib/playerStats';
+
+export function getStaticPaths() {
+  return getAllPlayerNames().map((name) => ({
+    params: { slug: slugifyPlayer(name) },
+    props: { name },
+  }));
+}
+
+const name = Astro.props.name ?? getPlayerBySlug(Astro.params.slug ?? '');
+if (!name) return Astro.redirect('/');
+
+const stats = getPlayerStats(name);
+const qualifiziert = (stats.standing?.platz ?? 99) <= 2;
+---
+
+<Layout title={`${name} · Spielerstatistik · TC Muckensturm`}>
+  <header class="border-b border-deep-ink/10 bg-warm-sand">
+    <div class="mx-auto max-w-5xl px-4 pt-6 pb-5 sm:px-8 sm:pt-10 sm:pb-7">
+      <a href="/" class="label-mono text-club-blue">Zurück zur Übersicht</a>
+      <div class="mt-5 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+        <div>
+          <div class="label-mono text-muted-2">Spielerstatistik</div>
+          <h1 class="mt-1 font-serif text-[40px] leading-[0.95] text-deep-ink sm:text-5xl">{name}</h1>
+        </div>
+        {stats.einzel && (
+          <div class="rounded-sm border border-deep-ink/10 bg-white/40 px-3 py-2 sm:min-w-40 sm:text-right">
+            <div class="label-mono text-muted-2">Gruppe {stats.einzel.gruppe}</div>
+            <div class="mt-1 font-mono text-sm text-deep-ink">
+              Platz {stats.standing?.platz ?? '-'}{qualifiziert ? ' · Achtelfinale' : ''}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-5xl px-4 py-5 sm:px-8 sm:py-8">
+    <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="stat-box">
+        <div class="label-mono text-muted-2">Punkte</div>
+        <div class="stat-number">{stats.standing?.punkte ?? 0}</div>
+      </div>
+      <div class="stat-box">
+        <div class="label-mono text-muted-2">Einzel</div>
+        <div class="stat-number">{stats.totals.einzelGespielt}/{stats.einzelMatches.length}</div>
+      </div>
+      <div class="stat-box">
+        <div class="label-mono text-muted-2">Siege</div>
+        <div class="stat-number">{stats.standing?.siege ?? 0}</div>
+      </div>
+      <div class="stat-box">
+        <div class="label-mono text-muted-2">Doppel</div>
+        <div class="stat-number">{stats.totals.doppelGespielt}/{stats.doppelMatches.length}</div>
+      </div>
+    </section>
+
+    <section class="mt-5 overflow-hidden rounded-sm border border-deep-ink/10 bg-white/60">
+      <header class="border-b border-deep-ink/10 bg-warm-sand-2/40 px-4 py-3 sm:px-6">
+        <div class="label-mono text-club-blue">Einzel Statistik</div>
+      </header>
+      <div class="grid gap-0 divide-y divide-deep-ink/8 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+        <div class="px-4 py-4 sm:px-6">
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <div class="label-mono text-muted-2">Satzpunkte</div>
+              <div class="mt-1 font-mono text-lg text-deep-ink">{stats.totals.einzelPunkteAusSaetzen}</div>
+            </div>
+            <div>
+              <div class="label-mono text-muted-2">Siegbonus</div>
+              <div class="mt-1 font-mono text-lg text-deep-ink">{stats.totals.einzelBonus}</div>
+            </div>
+            <div>
+              <div class="label-mono text-muted-2">Saetze</div>
+              <div class="mt-1 font-mono text-lg text-deep-ink">
+                {stats.standing?.saetzeGewonnen ?? 0}:{stats.standing?.saetzeVerloren ?? 0}
+              </div>
+            </div>
+            <div>
+              <div class="label-mono text-muted-2">Games</div>
+              <div class="mt-1 font-mono text-lg text-deep-ink">
+                {stats.standing?.spieleGewonnen ?? 0}:{stats.standing?.spieleVerloren ?? 0}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="px-4 py-4 sm:px-6">
+          <div class="grid grid-cols-3 gap-3 text-sm">
+            <div>
+              <div class="label-mono text-muted-2">Offen</div>
+              <div class="mt-1 font-mono text-lg text-deep-ink">{stats.totals.einzelOffen}</div>
+            </div>
+            <div>
+              <div class="label-mono text-muted-2">Terminiert</div>
+              <div class="mt-1 font-mono text-lg text-deep-ink">{stats.totals.einzelTerminiert}</div>
+            </div>
+            <div>
+              <div class="label-mono text-muted-2">Gespielt</div>
+              <div class="mt-1 font-mono text-lg text-deep-ink">{stats.totals.einzelGespielt}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-5 overflow-hidden rounded-sm border border-deep-ink/10 bg-white/60">
+      <header class="border-b border-deep-ink/10 bg-warm-sand-2/40 px-4 py-3 sm:px-6">
+        <div class="label-mono text-club-blue">Punkteaufschlüsselung</div>
+      </header>
+      <div class="divide-y divide-deep-ink/8">
+        {stats.breakdowns.length === 0 ? (
+          <p class="px-4 py-4 text-sm text-muted sm:px-6">Keine Einzelmatches gefunden.</p>
+        ) : (
+          stats.breakdowns.map((item) => (
+            <article class="px-4 py-4 sm:px-6">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <div class="label-mono text-court-red">Gruppe {item.match.gruppe} · {item.match.monat}</div>
+                  <h2 class="mt-1 text-[15px] font-semibold leading-tight text-deep-ink">
+                    {name} vs {item.opponent}
+                  </h2>
+                </div>
+                <div class="font-mono text-sm tabular-nums text-deep-ink">{item.total} Pkt</div>
+              </div>
+
+              {item.status === 'gespielt' ? (
+                <div class="mt-3">
+                  <div class="font-mono text-sm text-muted">{item.result}</div>
+                  <div class="mt-3 grid gap-2">
+                    {item.lines.map((line) => (
+                      <div class="grid grid-cols-[auto_1fr_auto] gap-3 text-sm">
+                        <span class="font-mono tabular-nums text-deep-ink">{line.result}</span>
+                        <span class="text-muted">{line.label}</span>
+                        <span class="font-mono tabular-nums text-deep-ink">+{line.points}</span>
+                      </div>
+                    ))}
+                    <div class="grid grid-cols-[auto_1fr_auto] gap-3 border-t border-deep-ink/10 pt-2 text-sm">
+                      <span class="font-mono text-deep-ink">Bonus</span>
+                      <span class="text-muted">{item.bonus > 0 ? (item.won ? 'Siegbonus' : 'Kein Bonus') : 'Kein Bonus'}</span>
+                      <span class="font-mono tabular-nums text-deep-ink">+{item.bonus}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div class="mt-2 font-mono text-[11px] uppercase tracking-wider text-muted-2">
+                  {item.status === 'terminiert' ? `Termin · ${item.match.termin}` : 'Offen'}
+                </div>
+              )}
+            </article>
+          ))
+        )}
+      </div>
+    </section>
+
+    <section class="mt-5 overflow-hidden rounded-sm border border-deep-ink/10 bg-white/60">
+      <header class="border-b border-deep-ink/10 bg-warm-sand-2/40 px-4 py-3 sm:px-6">
+        <div class="label-mono text-club-blue">Doppel</div>
+      </header>
+      <div class="divide-y divide-deep-ink/8">
+        {stats.doppelMatches.length === 0 ? (
+          <p class="px-4 py-4 text-sm text-muted sm:px-6">Kein Doppelmatch gefunden.</p>
+        ) : (
+          stats.doppelMatches.map((match) => {
+            const team = getDoppelTeam(match, name);
+            const result = [match.satz1, match.satz2, match.mtb].filter(Boolean).join(' · ');
+            const status = match.sieger ? 'Gespielt' : match.termin ? 'Terminiert' : match.doppelB ? 'Offen' : 'Freilos';
+
+            return (
+              <article class="px-4 py-4 sm:px-6">
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <div class="label-mono text-court-red">{match.runde} · Match {String(match.nr).padStart(2, '0')}</div>
+                    <h2 class="mt-1 text-[15px] font-semibold leading-tight text-deep-ink">{team.team}</h2>
+                  </div>
+                  <div class="font-mono text-[11px] uppercase tracking-wider text-muted-2">{status}</div>
+                </div>
+                <div class="mt-2 grid gap-1 font-mono text-[11px] uppercase tracking-wider text-muted-2">
+                  <div>Partner · {team.partner}</div>
+                  <div>Gegner · {team.opponent}</div>
+                  {match.termin && <div>Termin · {match.termin}</div>}
+                  {result && <div>Ergebnis · {result}</div>}
+                </div>
+              </article>
+            );
+          })
+        )}
+      </div>
+    </section>
+  </main>
+
+  <style>
+    .stat-box {
+      border: 1px solid rgba(26, 31, 46, 0.1);
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.58);
+      padding: 0.9rem 1rem;
+    }
+    .stat-number {
+      margin-top: 0.35rem;
+      font-family: var(--font-mono);
+      font-size: 1.35rem;
+      line-height: 1;
+      color: var(--color-deep-ink);
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+</Layout>

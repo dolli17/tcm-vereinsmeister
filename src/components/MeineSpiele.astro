@@ -1,0 +1,323 @@
+---
+import einzelData from '../data/einzel.json';
+import doppelData from '../data/doppel.json';
+import spielerData from '../data/spieler.json';
+import { slugifyPlayer } from '../lib/playerStats';
+
+type EinzelMatch = {
+  nr: number;
+  gruppe: number;
+  monat: string;
+  spielerA: string;
+  spielerB: string;
+  termin: string | null;
+  satz1: string | null;
+  satz2: string | null;
+  mtb: string | null;
+  sieger: 'A' | 'B' | null;
+};
+
+type DoppelMatch = {
+  runde: string;
+  nr: number;
+  doppelA: string | null;
+  doppelB: string | null;
+  termin: string | null;
+  satz1: string | null;
+  satz2: string | null;
+  mtb: string | null;
+  sieger: 'A' | 'B' | null;
+};
+
+const einzelMatches = einzelData.matches as EinzelMatch[];
+const doppelMatches = doppelData.matches as DoppelMatch[];
+
+const einzelSpieler = (spielerData.einzel as { name: string }[]).map((s) => s.name);
+const doppelSpieler = doppelMatches.flatMap((m) =>
+  [m.doppelA, m.doppelB].flatMap((d) => (d ? d.split('/').map((p) => p.trim()) : [])),
+);
+const spielerNamen = Array.from(new Set([...einzelSpieler, ...doppelSpieler])).sort((a, b) =>
+  a.localeCompare(b, 'de'),
+);
+const spielerLinks = spielerNamen.map((name) => ({ name, slug: slugifyPlayer(name) }));
+---
+
+<section class="mb-4 overflow-hidden rounded-sm border border-deep-ink/10 bg-white/55 backdrop-blur-sm sm:mb-6">
+  <details class="player-details" data-player-details>
+    <summary class="player-summary">
+      <span>
+        <span class="label-mono block text-club-blue">Meine Spiele</span>
+        <span class="mt-1 block text-sm leading-tight text-muted">Spieler suchen und persönlichen Spielplan anzeigen</span>
+      </span>
+      <span class="player-summary-mark" aria-hidden="true"></span>
+    </summary>
+
+    <div class="border-t border-deep-ink/10 px-3 py-3 sm:px-6 sm:py-4">
+      <div class="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+        <label class="block">
+          <span class="label-mono mb-1.5 block text-muted-2">Spieler suchen</span>
+          <input
+            class="player-search"
+            type="search"
+            list="spieler-suche"
+            placeholder="Name eingeben"
+            autocomplete="off"
+            data-player-search
+          />
+        </label>
+        <button type="button" class="clear-player" data-player-clear>Zurücksetzen</button>
+      </div>
+      <datalist id="spieler-suche">
+        {spielerNamen.map((name) => <option value={name} />)}
+      </datalist>
+    </div>
+
+    <div class="border-t border-deep-ink/10 px-3 py-3 sm:px-6 sm:py-4" data-player-results>
+      <p class="text-sm leading-relaxed text-muted">
+        Wähle einen Spieler aus, um alle Einzel- und Doppelmatches dieses Spielers zu sehen.
+      </p>
+    </div>
+  </details>
+</section>
+
+<script define:vars={{ einzelMatches, doppelMatches, spielerLinks }}>
+  const input = document.querySelector('[data-player-search]');
+  const clearBtn = document.querySelector('[data-player-clear]');
+  const results = document.querySelector('[data-player-results]');
+  const details = document.querySelector('[data-player-details]');
+
+  function doppelPlayers(doppel) {
+    return doppel ? doppel.split('/').map((p) => p.trim()) : [];
+  }
+
+  function statusOf(match, hasOpponent = true) {
+    if (!hasOpponent) return 'Freilos';
+    if (match.sieger === 'A' || match.sieger === 'B') return 'Gespielt';
+    if (match.termin) return 'Terminiert';
+    return 'Offen';
+  }
+
+  function resultOf(match) {
+    return [match.satz1, match.satz2, match.mtb].filter(Boolean).join(' · ');
+  }
+
+  function normalize(value) {
+    return value.trim().toLocaleLowerCase('de');
+  }
+
+  function selectedPlayerLink(query) {
+    return spielerLinks.find((player) => normalize(player.name) === query);
+  }
+
+  function matchCard(item) {
+    const result = item.result ? `<div class="player-result">${item.result}</div>` : '';
+    return `
+      <article class="player-card">
+        <div class="player-card-head">
+          <div>
+            <div class="label-mono text-club-blue">${item.art}</div>
+            <div class="mt-1 font-mono text-[11px] text-muted-2">${item.context} · ${item.number}</div>
+          </div>
+          <div class="player-status">${item.status}</div>
+        </div>
+        <div class="mt-3 text-[15px] leading-tight text-deep-ink">${item.playerLine}</div>
+        <div class="mt-1 font-mono text-[10px] uppercase tracking-wider text-muted-2">${item.detail}</div>
+        ${result}
+      </article>
+    `;
+  }
+
+  function render() {
+    if (!input || !results) return;
+    const query = normalize(input.value);
+    if (!query) {
+      results.innerHTML = '<p class="text-sm leading-relaxed text-muted">Wähle einen Spieler aus, um alle Einzel- und Doppelmatches dieses Spielers zu sehen.</p>';
+      return;
+    }
+
+    const einzel = einzelMatches
+      .filter((m) => normalize(m.spielerA).includes(query) || normalize(m.spielerB).includes(query))
+      .map((m) => {
+        const selectedIsA = normalize(m.spielerA).includes(query);
+        const opponent = selectedIsA ? m.spielerB : m.spielerA;
+        return {
+          art: 'Einzel',
+          context: `Gruppe ${m.gruppe} · ${m.monat}`,
+          number: `Match ${String(m.nr).padStart(2, '0')}`,
+          playerLine: `${m.spielerA} vs ${m.spielerB}`,
+          detail: `Gegner: ${opponent}${m.termin ? ` · Termin: ${m.termin}` : ''}`,
+          status: statusOf(m),
+          result: resultOf(m),
+        };
+      });
+
+    const doppel = doppelMatches
+      .filter((m) => [...doppelPlayers(m.doppelA), ...doppelPlayers(m.doppelB)].some((p) => normalize(p).includes(query)))
+      .map((m) => {
+        const teamA = doppelPlayers(m.doppelA);
+        const teamB = doppelPlayers(m.doppelB);
+        const selectedInA = teamA.some((p) => normalize(p).includes(query));
+        const ownTeam = selectedInA ? teamA : teamB;
+        const otherTeam = selectedInA ? teamB : teamA;
+        const partner = ownTeam.find((p) => !normalize(p).includes(query)) ?? 'ohne Partner';
+        const opponent = otherTeam.length > 0 ? otherTeam.join(' / ') : 'Freilos';
+        return {
+          art: 'Doppel',
+          context: m.runde,
+          number: `Match ${String(m.nr).padStart(2, '0')}`,
+          playerLine: `${m.doppelA ?? 'Freilos'} vs ${m.doppelB ?? 'Freilos'}`,
+          detail: `Partner: ${partner} · Gegner: ${opponent}${m.termin ? ` · Termin: ${m.termin}` : ''}`,
+          status: statusOf(m, Boolean(m.doppelB)),
+          result: resultOf(m),
+        };
+      });
+
+    const items = [...einzel, ...doppel];
+    if (items.length === 0) {
+      results.innerHTML = '<p class="text-sm leading-relaxed text-muted">Keine Matches für diese Suche gefunden.</p>';
+      return;
+    }
+
+    const playerLink = selectedPlayerLink(query);
+    const statsLink = playerLink
+      ? `<a class="player-stats-link" href="/spieler/${playerLink.slug}/">Statistik für ${playerLink.name} öffnen</a>`
+      : '';
+
+    results.innerHTML = `
+      <div class="label-mono mb-3 text-court-red">${items.length} Matches gefunden</div>
+      ${statsLink}
+      <div class="grid gap-3">${items.map(matchCard).join('')}</div>
+    `;
+  }
+
+  input?.addEventListener('input', render);
+  clearBtn?.addEventListener('click', () => {
+    if (!input) return;
+    input.value = '';
+    render();
+    input.focus();
+  });
+  details?.addEventListener('toggle', () => {
+    if (details.open) input?.focus();
+  });
+</script>
+
+<style>
+  .player-summary {
+    cursor: pointer;
+    display: flex;
+    min-height: 62px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 0.9rem 0.85rem 1rem;
+    list-style: none;
+  }
+  .player-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .player-summary-mark {
+    position: relative;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+    border: 1px solid rgba(26, 31, 46, 0.16);
+    border-radius: 999px;
+  }
+  .player-summary-mark::before,
+  .player-summary-mark::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 12px;
+    height: 1px;
+    background: var(--color-deep-ink);
+    content: "";
+    transform: translate(-50%, -50%);
+  }
+  .player-summary-mark::after {
+    transform: translate(-50%, -50%) rotate(90deg);
+    transition: opacity 0.18s ease;
+  }
+  .player-details[open] .player-summary-mark::after {
+    opacity: 0;
+  }
+
+  .player-search {
+    width: 100%;
+    min-height: 46px;
+    border: 1px solid rgba(26, 31, 46, 0.16);
+    border-radius: 4px;
+    padding: 0.7rem 0.85rem;
+    color: var(--color-deep-ink);
+    background: rgba(255, 255, 255, 0.62);
+    font: inherit;
+    outline: none;
+  }
+  .player-search:focus {
+    border-color: var(--color-deep-ink);
+  }
+
+  .clear-player {
+    cursor: pointer;
+    min-height: 42px;
+    border: 1px solid rgba(26, 31, 46, 0.16);
+    border-radius: 4px;
+    padding: 0.7rem 0.9rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 1.2px;
+    line-height: 1;
+    text-transform: uppercase;
+    color: var(--color-muted);
+    background: transparent;
+  }
+  .clear-player:active {
+    transform: translateY(1px);
+  }
+
+  :global(.player-card) {
+    border-left: 2px solid rgba(26, 139, 199, 0.55);
+    padding: 0.85rem 0 0.85rem 0.85rem;
+  }
+  :global(.player-card-head) {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  :global(.player-status) {
+    flex: 0 0 auto;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 1.1px;
+    line-height: 1;
+    text-transform: uppercase;
+    color: var(--color-muted-2);
+  }
+  :global(.player-result) {
+    margin-top: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-deep-ink);
+  }
+  :global(.player-stats-link) {
+    display: block;
+    margin-bottom: 0.75rem;
+    border: 1px solid rgba(26, 31, 46, 0.14);
+    border-radius: 4px;
+    padding: 0.75rem 0.85rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 1.1px;
+    line-height: 1.2;
+    text-transform: uppercase;
+    color: var(--color-deep-ink);
+    background: rgba(255, 255, 255, 0.5);
+    text-decoration: none;
+  }
+</style>

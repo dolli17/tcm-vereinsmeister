@@ -1,0 +1,53 @@
+---
+import type { Match } from '../lib/standings';
+import { isMatchPlayed, formatResult, matchStatus } from '../lib/standings';
+
+type Props = { match: Match };
+const { match } = Astro.props;
+
+const status = matchStatus(match);
+const result = formatResult(match);
+const winnerIsA = match.sieger === 'A';
+const winnerIsB = match.sieger === 'B';
+---
+
+<div
+  class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 border-t border-deep-ink/8 px-1 py-3 first:border-t-0 sm:grid-cols-[auto_1fr_auto] sm:items-center sm:gap-4 sm:px-2"
+  data-match-row
+  data-status={status}
+  data-monat={match.monat}
+  data-players={`${match.spielerA}|${match.spielerB}`}
+>
+  <div class="font-mono text-[11px] tabular-nums text-muted-2">
+    {String(match.nr).padStart(2, '0')}
+  </div>
+
+  <div class="min-w-0">
+    <div class="flex flex-col gap-0.5 text-[15px] leading-tight sm:flex-row sm:items-center sm:gap-2">
+      <span class={`truncate ${winnerIsA ? 'font-semibold text-deep-ink' : winnerIsB ? 'text-muted-2' : 'text-deep-ink'}`}>
+        {match.spielerA}
+      </span>
+      <span class="hidden font-mono text-[10px] uppercase tracking-wider text-muted-2 sm:inline">vs</span>
+      <span class={`truncate ${winnerIsB ? 'font-semibold text-deep-ink' : winnerIsA ? 'text-muted-2' : 'text-deep-ink'}`}>
+        {match.spielerB}
+      </span>
+    </div>
+    {match.termin && status !== 'gespielt' && (
+      <div class="mt-1 font-mono text-[10px] uppercase tracking-wider text-muted-2">
+        Termin · {match.termin}
+      </div>
+    )}
+  </div>
+
+  <div class="col-start-2 text-left sm:col-start-auto sm:text-right">
+    {status === 'gespielt' ? (
+      <span class="font-mono text-[12px] tabular-nums text-deep-ink sm:text-[13px]">
+        {result}
+      </span>
+    ) : status === 'terminiert' ? (
+      <span class="label-mono text-club-blue">terminiert</span>
+    ) : (
+      <span class="label-mono text-muted-2">offen</span>
+    )}
+  </div>
+</div>
