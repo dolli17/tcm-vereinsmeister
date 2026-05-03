@@ -22,10 +22,10 @@
     { "name": "Jakob Steinle", "gruppe": 4, "gesetzt": false },
 
     { "name": "Lucas Dollmann", "gruppe": 5, "gesetzt": true },
-    { "name": "Adamson E.", "gruppe": 5, "gesetzt": false },
+    { "name": "Edinson Espinoza", "gruppe": 5, "gesetzt": false },
     { "name": "Andreas Vogel", "gruppe": 5, "gesetzt": false },
     { "name": "Nick Kindermann", "gruppe": 5, "gesetzt": false },
-    { "name": "Leonel G.", "gruppe": 5, "gesetzt": false },
+    { "name": "Leonel Goncalves Mendes", "gruppe": 5, "gesetzt": false },
 
     { "name": "Amar Loncarevic", "gruppe": 6, "gesetzt": true },
     { "name": "Tom Kindermann", "gruppe": 6, "gesetzt": false },
@@ -39,7 +39,7 @@
     { "name": "Maximilian Fischer", "gruppe": 7, "gesetzt": false },
 
     { "name": "Louis Cieplik", "gruppe": 8, "gesetzt": true },
-    { "name": "Louis Manos", "gruppe": 8, "gesetzt": false },
+    { "name": "Manos Karampakakis", "gruppe": 8, "gesetzt": false },
     { "name": "Jochen Eiden", "gruppe": 8, "gesetzt": false },
     { "name": "Nick Klenk", "gruppe": 8, "gesetzt": false }
   ]
