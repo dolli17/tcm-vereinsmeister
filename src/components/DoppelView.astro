@@ -17,6 +17,7 @@ const matches = (doppelData.matches as DoppelMatch[]) ?? [];
 const isEmpty = matches.length === 0;
 
 const runden = Array.from(new Set(matches.map((m) => m.runde)));
+const aktuelleRunde = runden[0] ?? 'Aktuelle Runde';
 
 function isPlayed(match: DoppelMatch): boolean {
   return match.sieger === 'A' || match.sieger === 'B';
@@ -49,9 +50,18 @@ function playersOfDoppel(doppel: string | null): string[] {
   </div>
 ) : (
   <div class="space-y-5 sm:space-y-6">
+    <section class="rounded-sm border border-club-blue/25 bg-white/60 px-4 py-3.5 shadow-[0_10px_34px_-30px_rgba(26,31,46,0.55)] backdrop-blur-sm sm:px-6">
+      <div class="label-mono text-club-blue">Aktuelle Runde</div>
+      <p class="mt-1.5 text-sm leading-relaxed text-muted sm:text-[15px]">
+        Die {aktuelleRunde} im Herren Doppel ist im Mai zu spielen. Bitte stimmt eure Termine selbstständig
+        ab und meldet sie vor dem Spiel dem Sportwart.
+      </p>
+    </section>
+
     {runden.map((runde) => {
       const rundenMatches = matches.filter((m) => m.runde === runde).sort((a, b) => a.nr - b.nr);
       const gespielt = rundenMatches.filter(isPlayed).length;
+      const isAktuelleRunde = runde === aktuelleRunde;
 
       return (
         <section class="overflow-hidden rounded-sm border border-deep-ink/10 bg-white/60 shadow-[0_10px_34px_-30px_rgba(26,31,46,0.55)] backdrop-blur-sm">
@@ -59,7 +69,7 @@ function playersOfDoppel(doppel: string | null): string[] {
             <div>
               <div class="label-mono text-club-blue">{runde}</div>
               <div class="mt-0.5 font-mono text-[11px] text-muted-2">
-                {rundenMatches.length} Matches · {gespielt} gespielt
+                {rundenMatches.length} Matches · {gespielt} gespielt{isAktuelleRunde ? ' · im Mai zu spielen' : ''}
               </div>
             </div>
             <div class="label-mono text-court-red">Herren Doppel</div>
