@@ -12,6 +12,17 @@ const matchesJuni = getMatches(gruppe, 'Juni');
 const matchesJuli = getMatches(gruppe, 'Juli');
 const gesetzt = spieler.find((s) => s.gesetzt);
 const standingRows = standings.map((row) => ({ ...row, qualifiziert: row.platz <= 2 }));
+
+function whatsappHref(telefon: string): string {
+  const digits = telefon.replace(/\D/g, '');
+  const internationalNumber = digits.startsWith('00')
+    ? digits.slice(2)
+    : digits.startsWith('0')
+      ? `49${digits.slice(1)}`
+      : digits;
+  const text = encodeURIComponent('Hallo, ich melde mich wegen der Vereinsmeisterschaft.');
+  return `https://wa.me/${internationalNumber}?text=${text}`;
+}
 ---
 
 <section class="overflow-hidden rounded-sm border border-deep-ink/10 bg-white/60 shadow-[0_10px_34px_-30px_rgba(26,31,46,0.55)] backdrop-blur-sm" data-gruppe={gruppe}>
@@ -47,7 +58,41 @@ const standingRows = standings.map((row) => ({ ...row, qualifiziert: row.platz <
           <tr class={`border-b border-deep-ink/8 last:border-b-0 ${row.qualifiziert ? 'bg-club-blue/6' : ''}`}>
             <td class="px-1 py-2.5 font-mono text-[11px] tabular-nums text-muted-2">{row.platz}</td>
             <td class="min-w-0 px-1.5 py-2.5 sm:px-2">
-              <span class={`block truncate ${row.qualifiziert ? 'font-semibold text-deep-ink' : 'text-deep-ink'}`}>{row.name}</span>
+              <span class="flex min-w-0 items-center gap-1.5">
+                <span class={`truncate ${row.qualifiziert ? 'font-semibold text-deep-ink' : 'text-deep-ink'}`}>{row.name}</span>
+                {row.telefon && (
+                  <span class="contact-actions">
+                    <a
+                      class="contact-link contact-link-whatsapp"
+                      href={whatsappHref(row.telefon)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`WhatsApp an ${row.name} öffnen`}
+                      title={`WhatsApp an ${row.name} öffnen`}
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 20 20">
+                        <path d="M5.2 15.1 3 17l.7-2.8A7 7 0 1 1 5.2 15.1Z" />
+                        <path d="M7.2 6.9c.2-.4.4-.5.7-.5h.5c.2 0 .4.1.5.4l.5 1.2c.1.3 0 .5-.2.7l-.4.4c.5.9 1.2 1.6 2.1 2.1l.4-.4c.2-.2.5-.3.7-.2l1.2.5c.3.1.4.3.4.6v.5c0 .3-.2.5-.5.7-.6.3-1.3.3-2.2 0-1.8-.6-3.7-2.5-4.3-4.3-.3-.8-.3-1.5 0-2.1Z" />
+                      </svg>
+                    </a>
+                    <button
+                      class="contact-link contact-link-number"
+                      type="button"
+                      data-phone-open
+                      data-phone-name={row.name}
+                      data-phone-number={row.telefon}
+                      aria-label={`Telefonnummer von ${row.name} anzeigen`}
+                      title={`Telefonnummer von ${row.name} anzeigen`}
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 20 20">
+                        <path d="M7.1 4.1 8.3 6.7 7 8c.6 1.5 1.7 2.7 3.1 3.1l1.3-1.3 2.6 1.2-.2 2.2c0 .5-.4.9-.9.9-4.4-.1-8-3.7-8.1-8.1 0-.5.4-.9.9-.9l2.4-.1Z" />
+                        <path d="M12.4 4.4h2.9v2.9" />
+                        <path d="m11.7 8 3.5-3.5" />
+                      </svg>
+                    </button>
+                  </span>
+                )}
+              </span>
               {row.qualifiziert && (
                 <span class="mt-1 block font-mono text-[9px] uppercase tracking-[1px] text-club-blue">
                   Achtelfinale
@@ -98,7 +143,71 @@ const standingRows = standings.map((row) => ({ ...row, qualifiziert: row.platz <
       ))}
     </div>
   </details>
+
+  <dialog class="phone-dialog rounded-sm border border-deep-ink/15 bg-warm-sand p-0 text-deep-ink shadow-[0_24px_70px_-36px_rgba(26,31,46,0.45)] backdrop:bg-deep-ink/45" data-phone-dialog>
+    <div class="border-b border-deep-ink/10 px-4 py-4">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <div class="label-mono text-club-blue">Kontakt</div>
+          <h2 class="mt-1 font-serif text-2xl leading-tight" data-phone-dialog-name></h2>
+        </div>
+        <button type="button" class="phone-dialog-close" data-phone-close aria-label="Telefonnummer schliessen">
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+    </div>
+    <div class="phone-dialog-panel">
+      <div class="phone-dialog-number" data-phone-dialog-number></div>
+    </div>
+  </dialog>
 </section>
+
+<script>
+  document.querySelectorAll('[data-gruppe]').forEach((section) => {
+    const dialog = section.querySelector('[data-phone-dialog]');
+    const closeButton = section.querySelector('[data-phone-close]');
+    const nameTarget = section.querySelector('[data-phone-dialog-name]');
+    const numberTarget = section.querySelector('[data-phone-dialog-number]');
+    if (!(dialog instanceof HTMLDialogElement) || !nameTarget || !numberTarget) return;
+
+    function openDialog() {
+      if (!dialog.open) {
+        dialog.showModal();
+        requestAnimationFrame(() => dialog.classList.add('is-open'));
+      }
+    }
+
+    function closeDialog() {
+      if (!dialog.open || dialog.classList.contains('is-closing')) return;
+
+      dialog.classList.remove('is-open');
+      dialog.classList.add('is-closing');
+      window.setTimeout(() => {
+        dialog.close();
+        dialog.classList.remove('is-closing');
+      }, 220);
+    }
+
+    section.querySelectorAll('[data-phone-open]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const name = button.getAttribute('data-phone-name') ?? '';
+        const number = button.getAttribute('data-phone-number') ?? '';
+        nameTarget.textContent = name;
+        numberTarget.textContent = number;
+        openDialog();
+      });
+    });
+
+    closeButton?.addEventListener('click', closeDialog);
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) closeDialog();
+    });
+    dialog.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      closeDialog();
+    });
+  });
+</script>
 
 <style>
   .match-summary {
@@ -110,6 +219,147 @@ const standingRows = standings.map((row) => ({ ...row, qualifiziert: row.platz <
     gap: 1rem;
     padding: 0.8rem 0.9rem;
     list-style: none;
+  }
+
+  .contact-actions {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .contact-link {
+    display: inline-flex;
+    width: 1.35rem;
+    height: 1.35rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(26, 31, 46, 0.14);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.52);
+    text-decoration: none;
+    transition:
+      background-color 0.16s ease,
+      border-color 0.16s ease,
+      transform 0.16s ease;
+  }
+
+  .contact-link-whatsapp {
+    color: #1f7a4d;
+  }
+
+  .contact-link-number {
+    color: var(--color-club-blue);
+    cursor: pointer;
+  }
+
+  .contact-link:hover {
+    border-color: rgba(28, 76, 128, 0.35);
+    background: rgba(255, 255, 255, 0.78);
+  }
+
+  .contact-link:active {
+    transform: translateY(1px);
+  }
+
+  .contact-link svg {
+    width: 0.88rem;
+    height: 0.88rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.55;
+  }
+
+  .phone-dialog {
+    position: fixed;
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    width: min(calc(100dvw - 2rem), 24rem);
+    max-height: min(calc(100dvh - 2rem), 760px);
+    margin: 0;
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 18px)) scale(0.96);
+    transition:
+      opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: opacity, transform;
+  }
+
+  .phone-dialog.is-open {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  .phone-dialog.is-closing {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 10px)) scale(0.98);
+  }
+
+  .phone-dialog::backdrop {
+    opacity: 0;
+    backdrop-filter: blur(3px);
+    transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .phone-dialog.is-open::backdrop {
+    opacity: 1;
+  }
+
+  .phone-dialog.is-closing::backdrop {
+    opacity: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .phone-dialog,
+    .phone-dialog::backdrop {
+      transition: none;
+      will-change: auto;
+    }
+  }
+
+  .phone-dialog-panel {
+    display: grid;
+    gap: 1rem;
+    padding: 1.1rem;
+  }
+
+  .phone-dialog-number {
+    border: 1px solid rgba(26, 31, 46, 0.1);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.52);
+    padding: 0.85rem;
+    font-family: var(--font-mono);
+    font-size: 1.05rem;
+    color: var(--color-deep-ink);
+  }
+
+  .phone-dialog-close {
+    cursor: pointer;
+    display: grid;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid rgba(26, 31, 46, 0.14);
+    border-radius: 4px;
+    color: var(--color-deep-ink);
+    background: transparent;
+    font-size: 24px;
+    line-height: 1;
+    transition: transform 0.18s ease, border-color 0.18s ease;
+  }
+
+  .phone-dialog-close:hover {
+    border-color: var(--color-deep-ink);
+  }
+
+  .phone-dialog-close:active {
+    transform: translateY(1px);
   }
   .match-summary::-webkit-details-marker {
     display: none;

@@ -21,11 +21,13 @@ export type Spieler = {
   name: string;
   gruppe: number;
   gesetzt: boolean;
+  telefon?: string;
 };
 
 export type StandingRow = {
   name: string;
   gesetzt: boolean;
+  telefon?: string;
   gespielt: number;
   siege: number;
   niederlagen: number;
@@ -125,6 +127,7 @@ export function computeStandings(gruppe: number): StandingRow[] {
   const rows: StandingRow[] = spieler.map((s) => ({
     name: s.name,
     gesetzt: s.gesetzt,
+    telefon: s.telefon,
     gespielt: 0,
     siege: 0,
     niederlagen: 0,
