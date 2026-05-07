@@ -1,13 +1,23 @@
 {
   "headline": "Mixed Doppel",
   "aktuelleRunde": "1. Runde",
-  "hinweis": "Die 1. Runde im Mixed Doppel ist im Mai zu spielen. Bitte stimmt eure Termine selbstständig ab und meldet sie vor dem Spiel dem Sportwart.",
+  "hinweis": "Knock-out-Phase · Setzung nach LK · 11 Paarungen im 16er-Feld · 5 Freilose in Runde 1 · Die 1. Runde ist im Mai zu spielen.",
   "runden": [
     {
       "name": "1. Runde",
       "matches": [
         {
           "nr": 1,
+          "teamA": "Lucas Dollmann / Ana Sunjic",
+          "teamB": "BYE",
+          "termin": null,
+          "satz1": null,
+          "satz2": null,
+          "mtb": null,
+          "sieger": null
+        },
+        {
+          "nr": 2,
           "teamA": "Olena Golubenko / Ladislav Virag",
           "teamB": "Branimir Sunjic / Sandra Sunjic",
           "termin": null,
@@ -17,7 +27,37 @@
           "sieger": null
         },
         {
-          "nr": 2,
+          "nr": 3,
+          "teamA": "Julia Skatulla / Gregor Skatulla",
+          "teamB": "BYE",
+          "termin": null,
+          "satz1": null,
+          "satz2": null,
+          "mtb": null,
+          "sieger": null
+        },
+        {
+          "nr": 4,
+          "teamA": "Moritz Schich / Paula Kaufmann",
+          "teamB": "BYE",
+          "termin": null,
+          "satz1": null,
+          "satz2": null,
+          "mtb": null,
+          "sieger": null
+        },
+        {
+          "nr": 5,
+          "teamA": "Julia Maier / Chris Fiedler",
+          "teamB": "BYE",
+          "termin": null,
+          "satz1": null,
+          "satz2": null,
+          "mtb": null,
+          "sieger": null
+        },
+        {
+          "nr": 6,
           "teamA": "Tim Strohm / Manuela Strohm",
           "teamB": "Sonja Knopp / Leonel Goncalves Mendes",
           "termin": null,
@@ -27,7 +67,17 @@
           "sieger": null
         },
         {
-          "nr": 3,
+          "nr": 7,
+          "teamA": "Lisa Rühl / Nick Klenk",
+          "teamB": "BYE",
+          "termin": null,
+          "satz1": null,
+          "satz2": null,
+          "mtb": null,
+          "sieger": null
+        },
+        {
+          "nr": 8,
           "teamA": "Julia Ilzhöfer / Wolfgang Putschky",
           "teamB": "Jenny Fischer / Georg Fischer",
           "termin": null,
@@ -43,27 +93,7 @@
       "matches": [
         {
           "nr": 1,
-          "teamA": "Lucas Dollmann / Ana Sunjic",
-          "teamB": "Sieger Match 1",
-          "termin": null,
-          "satz1": null,
-          "satz2": null,
-          "mtb": null,
-          "sieger": null
-        },
-        {
-          "nr": 2,
-          "teamA": "Julia Skatulla / Gregor Skatulla",
-          "teamB": "Moritz Schich / Paula Kaufmann",
-          "termin": null,
-          "satz1": null,
-          "satz2": null,
-          "mtb": null,
-          "sieger": null
-        },
-        {
-          "nr": 3,
-          "teamA": "Julia Maier / Chris Fiedler",
+          "teamA": "Sieger Match 1",
           "teamB": "Sieger Match 2",
           "termin": null,
           "satz1": null,
@@ -72,9 +102,29 @@
           "sieger": null
         },
         {
+          "nr": 2,
+          "teamA": "Sieger Match 3",
+          "teamB": "Sieger Match 4",
+          "termin": null,
+          "satz1": null,
+          "satz2": null,
+          "mtb": null,
+          "sieger": null
+        },
+        {
+          "nr": 3,
+          "teamA": "Sieger Match 5",
+          "teamB": "Sieger Match 6",
+          "termin": null,
+          "satz1": null,
+          "satz2": null,
+          "mtb": null,
+          "sieger": null
+        },
+        {
           "nr": 4,
-          "teamA": "Lisa Rühl / Nick Klenk",
-          "teamB": "Sieger Match 3",
+          "teamA": "Sieger Match 7",
+          "teamB": "Sieger Match 8",
           "termin": null,
           "satz1": null,
           "satz2": null,

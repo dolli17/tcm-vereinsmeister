@@ -25,7 +25,7 @@ interface Props {
 
 const {
   headline,
-  aktuelleRunde = runden?.[0]?.name ?? '',
+  aktuelleRunde = '',
   hinweis,
   runden = [],
   konkurrenzLabel = headline,
@@ -41,7 +41,8 @@ function formatResult(match: Match): string {
   return [match.satz1, match.satz2, match.mtb].filter(Boolean).join(' · ');
 }
 
-function matchStatus(match: Match): 'gespielt' | 'terminiert' | 'offen' {
+function matchStatus(match: Match): 'gespielt' | 'terminiert' | 'offen' | 'bye' {
+  if (match.teamB === 'BYE') return 'bye';
   if (isPlayed(match)) return 'gespielt';
   if (match.termin) return 'terminiert';
   return 'offen';
@@ -57,169 +58,167 @@ function matchStatus(match: Match): 'gespielt' | 'terminiert' | 'offen' {
 ) : (
   <div class="space-y-5 sm:space-y-6">
     <section class="rounded-sm border border-club-blue/25 bg-white/60 px-4 py-3.5 shadow-[0_10px_34px_-30px_rgba(26,31,46,0.55)] backdrop-blur-sm sm:px-6">
-      <div class="label-mono text-club-blue">Aktuelle Runde</div>
+      <div class="label-mono text-club-blue">{konkurrenzLabel}</div>
       <p class="mt-1.5 text-sm leading-relaxed text-muted sm:text-[15px]">{hinweis}</p>
     </section>
 
     <section class="space-y-4 sm:hidden">
-      {runden.map((runde) => {
-        const gespielt = runde.matches.filter(isPlayed).length;
-        const isAktuell = runde.name === aktuelleRunde;
-        return (
-          <section class="overflow-hidden rounded-sm border border-deep-ink/10 bg-white/60 shadow-[0_10px_34px_-30px_rgba(26,31,46,0.55)] backdrop-blur-sm">
-            <header class="flex items-baseline justify-between gap-3 border-b border-deep-ink/10 bg-warm-sand-2/40 px-3.5 py-3.5">
-              <div>
-                <div class="label-mono text-club-blue">{runde.name}</div>
-                <div class="mt-0.5 font-mono text-[11px] text-muted-2">
-                  {runde.matches.length} Matches · {gespielt} gespielt{isAktuell ? ' · im Mai zu spielen' : ''}
-                </div>
-              </div>
-              <div class="label-mono text-court-red">{konkurrenzLabel}</div>
-            </header>
-            <div class="divide-y divide-deep-ink/8">
-              {runde.matches.map((match) => {
-                const status = matchStatus(match);
-                const result = formatResult(match);
-                return (
-                  <article class="px-3.5 py-3.5">
-                    <div class="flex items-center justify-between gap-3">
-                      <div class="font-mono text-[11px] tabular-nums text-muted-2">Match {String(match.nr).padStart(2, '0')}</div>
-                      <div class="label-mono text-muted-2">{status === 'gespielt' ? 'Ergebnis' : status === 'terminiert' ? 'Termin' : 'offen'}</div>
+      {runden.map((runde) => (
+        <section class="overflow-hidden rounded-sm border border-deep-ink/10 bg-white/60 shadow-[0_10px_34px_-30px_rgba(26,31,46,0.55)] backdrop-blur-sm">
+          <header class="border-b border-deep-ink/10 bg-warm-sand-2/40 px-3.5 py-3.5">
+            <div class="label-mono text-club-blue">{runde.name}</div>
+          </header>
+          <div class="divide-y divide-deep-ink/8">
+            {runde.matches.map((match) => {
+              const status = matchStatus(match);
+              const result = formatResult(match);
+              return (
+                <article class="px-3.5 py-3.5">
+                  <div class="flex items-center justify-between gap-3 font-mono text-[11px] text-muted-2">
+                    <span>Match {String(match.nr).padStart(2, '0')}</span>
+                    <span>{status === 'gespielt' ? result : status === 'bye' ? 'BYE' : match.termin ?? 'offen'}</span>
+                  </div>
+                  <div class="mt-2 space-y-2">
+                    <div class={`rounded-sm border px-3 py-2 ${match.sieger === 'A' || status === 'bye' ? 'border-deep-ink/20 bg-warm-sand-2/55 font-semibold text-deep-ink' : 'border-deep-ink/10 bg-white/65 text-deep-ink'}`}>
+                      {match.teamA ?? 'TBD'}
                     </div>
-                    <div class="mt-2 space-y-2">
-                      <div class={`rounded-sm border px-3 py-2 ${match.sieger === 'A' ? 'border-deep-ink/20 bg-warm-sand-2/55 font-semibold text-deep-ink' : 'border-deep-ink/10 bg-white/65 text-deep-ink'}`}>
-                        {match.teamA ?? 'TBD'}
-                      </div>
-                      <div class="px-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-2">vs</div>
-                      <div class={`rounded-sm border px-3 py-2 ${match.sieger === 'B' ? 'border-deep-ink/20 bg-warm-sand-2/55 font-semibold text-deep-ink' : 'border-deep-ink/10 bg-white/65 text-deep-ink'}`}>
-                        {match.teamB ?? 'TBD'}
-                      </div>
+                    <div class="px-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-2">vs</div>
+                    <div class={`rounded-sm border px-3 py-2 ${match.sieger === 'B' ? 'border-deep-ink/20 bg-warm-sand-2/55 font-semibold text-deep-ink' : 'border-deep-ink/10 bg-white/65 text-deep-ink'}`}>
+                      {match.teamB ?? 'TBD'}
                     </div>
-                    <div class="mt-2 font-mono text-[11px] text-muted-2">
-                      {status === 'gespielt' ? result : match.termin ? `Termin · ${match.termin}` : 'Noch offen'}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      ))}
     </section>
 
     <section class="hidden sm:block">
       <div class="overflow-x-auto pb-4">
-        <div class="bracket min-w-[1260px]">
-          {runden.map((runde, roundIndex) => {
-            const gespielt = runde.matches.filter(isPlayed).length;
-            const isAktuell = runde.name === aktuelleRunde;
-            const topSpacing = roundIndex === 0 ? 0 : 84 * (2 ** (roundIndex - 1));
-            const matchGap = 28 + 92 * (2 ** roundIndex);
-            return (
-              <section class="bracket-round">
-                <header class="mb-5 px-1">
-                  <div class="label-mono text-club-blue">{runde.name}</div>
-                  <div class="mt-1 font-mono text-[11px] text-muted-2">
-                    {runde.matches.length} Matches · {gespielt} gespielt{isAktuell ? ' · im Mai zu spielen' : ''}
+        <div class="tournament-plan min-w-[1320px]">
+          <div class="label-mono mb-4 text-club-blue">Turnierplan</div>
+          <div class="tournament-grid">
+            {runden.map((runde, roundIndex) => {
+              const topOffset = roundIndex === 0 ? 0 : 76 * (2 ** (roundIndex - 1));
+              const gap = roundIndex === 0 ? 20 : 62 + 78 * (2 ** (roundIndex - 1));
+              return (
+                <section class="round-column">
+                  <header class="round-header">{runde.name}</header>
+                  <div class="round-body" style={`padding-top:${topOffset}px; gap:${gap}px;`}>
+                    {runde.matches.map((match) => {
+                      const status = matchStatus(match);
+                      const result = formatResult(match);
+                      return (
+                        <article class={`plan-match ${status === 'bye' ? 'is-bye' : ''}`}>
+                          <div class="plan-meta">
+                            <span>Match {String(match.nr).padStart(2, '0')}</span>
+                            <span>{status === 'gespielt' ? result : status === 'bye' ? 'BYE' : match.termin ?? 'offen'}</span>
+                          </div>
+                          <div class={`plan-team ${match.sieger === 'A' || status === 'bye' ? 'is-winner' : ''}`}>{match.teamA ?? 'TBD'}</div>
+                          <div class="plan-divider"></div>
+                          <div class={`plan-team ${match.sieger === 'B' ? 'is-winner' : ''}`}>{match.teamB ?? 'TBD'}</div>
+                        </article>
+                      );
+                    })}
                   </div>
-                </header>
-
-                <div class="bracket-lane" style={`padding-top:${topSpacing}px; gap:${matchGap}px;`}>
-                  {runde.matches.map((match) => {
-                    const status = matchStatus(match);
-                    const result = formatResult(match);
-                    return (
-                      <article class="bracket-match">
-                        <div class="bracket-match-meta">
-                          <span>Match {String(match.nr).padStart(2, '0')}</span>
-                          <span>{status === 'gespielt' ? result : match.termin ? match.termin : 'offen'}</span>
-                        </div>
-                        <div class={`bracket-team ${match.sieger === 'A' ? 'is-winner' : ''}`}>{match.teamA ?? 'TBD'}</div>
-                        <div class="bracket-team-divider" aria-hidden="true"></div>
-                        <div class={`bracket-team ${match.sieger === 'B' ? 'is-winner' : ''}`}>{match.teamB ?? 'TBD'}</div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </section>
-            );
-          })}
+                </section>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>
-
-  <style>
-    .bracket {
-      display: grid;
-      grid-auto-flow: column;
-      grid-auto-columns: minmax(270px, 1fr);
-      gap: 2rem;
-      align-items: start;
-    }
-
-    .bracket-round {
-      position: relative;
-    }
-
-    .bracket-lane {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .bracket-match {
-      position: relative;
-      min-height: 122px;
-      border: 1px solid rgba(26, 31, 46, 0.12);
-      background: rgba(255, 255, 255, 0.88);
-      box-shadow: 0 16px 40px -34px rgba(26, 31, 46, 0.7);
-      backdrop-filter: blur(10px);
-    }
-
-    .bracket-match::after {
-      content: '';
-      position: absolute;
-      top: 50%;
-      right: -2rem;
-      width: 2rem;
-      border-top: 1.5px solid rgba(26, 31, 46, 0.22);
-    }
-
-    .bracket-round:last-child .bracket-match::after {
-      display: none;
-    }
-
-    .bracket-match-meta {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.5rem;
-      border-bottom: 1px solid rgba(26, 31, 46, 0.08);
-      padding: 0.65rem 0.85rem;
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--color-muted-2);
-    }
-
-    .bracket-team {
-      position: relative;
-      padding: 0.9rem 1rem;
-      font-size: 0.95rem;
-      line-height: 1.3rem;
-      color: var(--color-deep-ink);
-      background: rgba(255, 255, 255, 0.96);
-    }
-
-    .bracket-team.is-winner {
-      background: rgba(246, 241, 233, 0.95);
-      font-weight: 600;
-    }
-
-    .bracket-team-divider {
-      border-top: 1px solid rgba(26, 31, 46, 0.08);
-    }
-  </style>
   </div>
 )}
+
+<style>
+  .tournament-plan {
+    position: relative;
+  }
+
+  .tournament-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(280px, 1fr);
+    gap: 2.25rem;
+    align-items: start;
+  }
+
+  .round-column {
+    position: relative;
+  }
+
+  .round-header {
+    margin-bottom: 1rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--color-muted-2);
+  }
+
+  .round-body {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .plan-match {
+    position: relative;
+    border: 1px solid rgba(26, 31, 46, 0.14);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 14px 36px -34px rgba(26, 31, 46, 0.8);
+  }
+
+  .plan-match::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: -2.25rem;
+    width: 2.25rem;
+    border-top: 1.5px solid rgba(26, 31, 46, 0.24);
+  }
+
+  .round-column:last-child .plan-match::after {
+    display: none;
+  }
+
+  .plan-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid rgba(26, 31, 46, 0.08);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-muted-2);
+  }
+
+  .plan-team {
+    padding: 0.8rem 0.95rem;
+    background: rgba(255, 255, 255, 0.98);
+    color: var(--color-deep-ink);
+    font-size: 0.95rem;
+    line-height: 1.28rem;
+  }
+
+  .plan-team.is-winner {
+    background: rgba(246, 241, 233, 0.98);
+    font-weight: 600;
+  }
+
+  .plan-divider {
+    border-top: 1px solid rgba(26, 31, 46, 0.08);
+  }
+
+  .is-bye .plan-team:last-child {
+    color: var(--color-court-red);
+    font-family: var(--font-mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+</style>
