@@ -109,37 +109,34 @@ function matchStatus(match: Match): 'gespielt' | 'terminiert' | 'offen' {
 
     <section class="hidden sm:block">
       <div class="overflow-x-auto pb-4">
-        <div class="bracket min-w-[1100px]">
+        <div class="bracket min-w-[1260px]">
           {runden.map((runde, roundIndex) => {
             const gespielt = runde.matches.filter(isPlayed).length;
             const isAktuell = runde.name === aktuelleRunde;
-            const roundSpacing = Math.max(0, 32 * ((2 ** roundIndex) - 1));
-            const laneGap = Math.max(16, 26 * (2 ** roundIndex));
+            const topSpacing = roundIndex === 0 ? 0 : 84 * (2 ** (roundIndex - 1));
+            const matchGap = 28 + 92 * (2 ** roundIndex);
             return (
               <section class="bracket-round">
-                <header class="mb-4 px-2">
+                <header class="mb-5 px-1">
                   <div class="label-mono text-club-blue">{runde.name}</div>
                   <div class="mt-1 font-mono text-[11px] text-muted-2">
                     {runde.matches.length} Matches · {gespielt} gespielt{isAktuell ? ' · im Mai zu spielen' : ''}
                   </div>
                 </header>
-                <div class="bracket-lane" style={`padding-top:${roundSpacing}px; gap:${laneGap}px;`}>
+
+                <div class="bracket-lane" style={`padding-top:${topSpacing}px; gap:${matchGap}px;`}>
                   {runde.matches.map((match) => {
                     const status = matchStatus(match);
                     const result = formatResult(match);
                     return (
                       <article class="bracket-match">
-                        <div class="flex items-center justify-between gap-2 border-b border-deep-ink/8 px-3 py-2">
-                          <div class="font-mono text-[11px] text-muted-2">Match {String(match.nr).padStart(2, '0')}</div>
-                          <div class="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-2">
-                            {status === 'gespielt' ? result : match.termin ? match.termin : 'offen'}
-                          </div>
+                        <div class="bracket-match-meta">
+                          <span>Match {String(match.nr).padStart(2, '0')}</span>
+                          <span>{status === 'gespielt' ? result : match.termin ? match.termin : 'offen'}</span>
                         </div>
-                        <div class="p-3">
-                          <div class={`bracket-team ${match.sieger === 'A' ? 'is-winner' : ''}`}>{match.teamA ?? 'TBD'}</div>
-                          <div class="bracket-divider">vs</div>
-                          <div class={`bracket-team ${match.sieger === 'B' ? 'is-winner' : ''}`}>{match.teamB ?? 'TBD'}</div>
-                        </div>
+                        <div class={`bracket-team ${match.sieger === 'A' ? 'is-winner' : ''}`}>{match.teamA ?? 'TBD'}</div>
+                        <div class="bracket-team-divider" aria-hidden="true"></div>
+                        <div class={`bracket-team ${match.sieger === 'B' ? 'is-winner' : ''}`}>{match.teamB ?? 'TBD'}</div>
                       </article>
                     );
                   })}
@@ -150,57 +147,79 @@ function matchStatus(match: Match): 'gespielt' | 'terminiert' | 'offen' {
         </div>
       </div>
     </section>
-+
-+  <style>
-+    .bracket {
-+      display: grid;
-+      grid-auto-flow: column;
-+      grid-auto-columns: minmax(240px, 1fr);
-+      gap: 1.25rem;
-+      align-items: start;
-+    }
-+
-+    .bracket-round {
-+      position: relative;
-+    }
-+
-+    .bracket-lane {
-+      position: relative;
-+      display: flex;
-+      flex-direction: column;
-+    }
-+
-+    .bracket-match {
-+      position: relative;
-+      border: 1px solid rgba(26, 31, 46, 0.12);
-+      background: rgba(255, 255, 255, 0.74);
-+      box-shadow: 0 10px 34px -30px rgba(26, 31, 46, 0.75);
-+      backdrop-filter: blur(10px);
-+    }
-+
-+    .bracket-team {
-+      border: 1px solid rgba(26, 31, 46, 0.1);
-+      background: rgba(255, 255, 255, 0.95);
-+      padding: 0.7rem 0.8rem;
-+      font-size: 0.95rem;
-+      line-height: 1.25rem;
-+      color: var(--color-deep-ink);
-+    }
-+
-+    .bracket-team.is-winner {
-+      border-color: rgba(26, 31, 46, 0.2);
-+      background: rgba(246, 241, 233, 0.95);
-+      font-weight: 600;
-+    }
-+
-+    .bracket-divider {
-+      padding: 0.5rem 0.35rem;
-+      font-family: var(--font-mono);
-+      font-size: 10px;
-+      letter-spacing: 0.22em;
-+      text-transform: uppercase;
-+      color: var(--color-muted-2);
-+    }
-+  </style>
+
+  <style>
+    .bracket {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(270px, 1fr);
+      gap: 2rem;
+      align-items: start;
+    }
+
+    .bracket-round {
+      position: relative;
+    }
+
+    .bracket-lane {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .bracket-match {
+      position: relative;
+      min-height: 122px;
+      border: 1px solid rgba(26, 31, 46, 0.12);
+      background: rgba(255, 255, 255, 0.88);
+      box-shadow: 0 16px 40px -34px rgba(26, 31, 46, 0.7);
+      backdrop-filter: blur(10px);
+    }
+
+    .bracket-match::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      right: -2rem;
+      width: 2rem;
+      border-top: 1.5px solid rgba(26, 31, 46, 0.22);
+    }
+
+    .bracket-round:last-child .bracket-match::after {
+      display: none;
+    }
+
+    .bracket-match-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      border-bottom: 1px solid rgba(26, 31, 46, 0.08);
+      padding: 0.65rem 0.85rem;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--color-muted-2);
+    }
+
+    .bracket-team {
+      position: relative;
+      padding: 0.9rem 1rem;
+      font-size: 0.95rem;
+      line-height: 1.3rem;
+      color: var(--color-deep-ink);
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    .bracket-team.is-winner {
+      background: rgba(246, 241, 233, 0.95);
+      font-weight: 600;
+    }
+
+    .bracket-team-divider {
+      border-top: 1px solid rgba(26, 31, 46, 0.08);
+    }
+  </style>
   </div>
 )}
