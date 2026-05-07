@@ -1,15 +1,15 @@
 ---
-import { computeStandings, getMatches, getSpielerOfGruppe } from '../lib/standings';
+import { computeStandings, getMatches, getSpielerOfGruppe, type Konkurrenz } from '../lib/standings';
 import MatchZeile from './MatchZeile.astro';
 
-type Props = { gruppe: number };
-const { gruppe } = Astro.props;
+type Props = { gruppe: number; konkurrenz?: Konkurrenz };
+const { gruppe, konkurrenz = 'herren' } = Astro.props;
 
-const spieler = getSpielerOfGruppe(gruppe);
-const standings = computeStandings(gruppe);
-const matchesMai = getMatches(gruppe, 'Mai');
-const matchesJuni = getMatches(gruppe, 'Juni');
-const matchesJuli = getMatches(gruppe, 'Juli');
+const spieler = getSpielerOfGruppe(gruppe, konkurrenz);
+const standings = computeStandings(gruppe, konkurrenz);
+const matchesMai = getMatches(gruppe, 'Mai', konkurrenz);
+const matchesJuni = getMatches(gruppe, 'Juni', konkurrenz);
+const matchesJuli = getMatches(gruppe, 'Juli', konkurrenz);
 const gesetzt = spieler.find((s) => s.gesetzt);
 const standingRows = standings.map((row) => ({ ...row, qualifiziert: row.platz <= 2 }));
 
@@ -25,7 +25,7 @@ function whatsappHref(telefon: string): string {
 }
 ---
 
-<section class="overflow-hidden rounded-sm border border-deep-ink/10 bg-white/60 shadow-[0_10px_34px_-30px_rgba(26,31,46,0.55)] backdrop-blur-sm" data-gruppe={gruppe}>
+<section class="overflow-hidden rounded-sm border border-deep-ink/10 bg-white/60 shadow-[0_10px_34px_-30px_rgba(26,31,46,0.55)] backdrop-blur-sm" data-gruppe={gruppe} data-konkurrenz={konkurrenz}>
   <header class="grid gap-3 border-b border-deep-ink/10 bg-warm-sand-2/40 px-3.5 py-3.5 sm:flex sm:items-baseline sm:justify-between sm:px-6">
     <div>
       <div class="label-mono text-club-blue">Gruppe {gruppe}</div>

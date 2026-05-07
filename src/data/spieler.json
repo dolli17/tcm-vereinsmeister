@@ -42,5 +42,17 @@
     { "name": "Manos Karampakakis", "gruppe": 8, "gesetzt": false, "telefon": "+49 160 8505417" },
     { "name": "Jochen Eiden", "gruppe": 8, "gesetzt": false, "telefon": "+49 1575 8809504" },
     { "name": "Nick Klenk", "gruppe": 8, "gesetzt": false, "telefon": "+49 1511 5976304" }
+  ],
+  "damenEinzel": [
+    { "name": "Manuela Strohm", "gruppe": 1, "gesetzt": true, "telefon": "0160 1244893" },
+    { "name": "Sonja Knopp", "gruppe": 1, "gesetzt": false, "telefon": "0176 43812334" },
+    { "name": "Franziska Borst", "gruppe": 1, "gesetzt": false },
+    { "name": "Anna Tepfenhart", "gruppe": 1, "gesetzt": false, "telefon": "0178 3395890" },
+
+    { "name": "Ana Sunjic", "gruppe": 2, "gesetzt": true, "telefon": "0152 54150068" },
+    { "name": "Lisa Rühl", "gruppe": 2, "gesetzt": false },
+    { "name": "Olena Golubenko", "gruppe": 2, "gesetzt": false, "telefon": "+49 160 95669728" },
+    { "name": "Anna-Sophia Utermann", "gruppe": 2, "gesetzt": false },
+    { "name": "Manuela Wältl", "gruppe": 2, "gesetzt": false, "telefon": "0157 79610827" }
   ]
 }

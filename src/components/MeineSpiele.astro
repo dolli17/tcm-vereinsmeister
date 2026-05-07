@@ -1,5 +1,6 @@
 ---
 import einzelData from '../data/einzel.json';
+import damenEinzelData from '../data/damen-einzel.json';
 import doppelData from '../data/doppel.json';
 import spielerData from '../data/spieler.json';
 import { slugifyPlayer } from '../lib/playerStats';
@@ -29,14 +30,18 @@ type DoppelMatch = {
   sieger: 'A' | 'B' | null;
 };
 
-const einzelMatches = einzelData.matches as EinzelMatch[];
+const einzelMatches = [
+  ...(einzelData.matches as EinzelMatch[]).map((m) => ({ ...m, art: 'Einzel' as const })),
+  ...(damenEinzelData.matches as EinzelMatch[]).map((m) => ({ ...m, art: 'Damen Einzel' as const })),
+];
 const doppelMatches = doppelData.matches as DoppelMatch[];
 
 const einzelSpieler = (spielerData.einzel as { name: string }[]).map((s) => s.name);
+const damenEinzelSpieler = (spielerData.damenEinzel as { name: string }[]).map((s) => s.name);
 const doppelSpieler = doppelMatches.flatMap((m) =>
   [m.doppelA, m.doppelB].flatMap((d) => (d ? d.split('/').map((p) => p.trim()) : [])),
 );
-const spielerNamen = Array.from(new Set([...einzelSpieler, ...doppelSpieler])).sort((a, b) =>
+const spielerNamen = Array.from(new Set([...einzelSpieler, ...damenEinzelSpieler, ...doppelSpieler])).sort((a, b) =>
   a.localeCompare(b, 'de'),
 );
 const spielerLinks = spielerNamen.map((name) => ({ name, slug: slugifyPlayer(name) }));
@@ -160,7 +165,7 @@ const spielerLinks = spielerNamen.map((name) => ({ name, slug: slugifyPlayer(nam
         const selectedIsA = normalize(m.spielerA).includes(query);
         const opponent = selectedIsA ? m.spielerB : m.spielerA;
         return {
-          art: 'Einzel',
+          art: m.art,
           context: `Gruppe ${m.gruppe} · ${m.monat}`,
           number: `Match ${String(m.nr).padStart(2, '0')}`,
           playerLine: `${m.spielerA} vs ${m.spielerB}`,

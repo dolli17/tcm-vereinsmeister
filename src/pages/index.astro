@@ -9,6 +9,7 @@ import MixedDoppelView from '../components/MixedDoppelView.astro';
 import { getGruppen } from '../lib/standings';
 
 const gruppen = getGruppen();
+const damenGruppen = getGruppen('damen');
 const monate = ['Alle', 'Mai', 'Juni', 'Juli'] as const;
 const stati = ['Alle', 'Offen', 'Terminiert', 'Gespielt'] as const;
 ---
@@ -18,9 +19,12 @@ const stati = ['Alle', 'Offen', 'Terminiert', 'Gespielt'] as const;
 
   <nav class="sticky top-0 z-20 border-b border-deep-ink/10 bg-warm-sand/95 shadow-[0_8px_24px_-22px_rgba(26,31,46,0.65)] backdrop-blur-sm">
     <div class="mx-auto max-w-5xl px-4 sm:px-8">
-      <div role="tablist" aria-label="Konkurrenzen" class="grid grid-cols-3 gap-1 pt-2 sm:flex sm:pt-3">
+      <div role="tablist" aria-label="Konkurrenzen" class="grid grid-cols-2 gap-1 pt-2 sm:flex sm:pt-3">
         <button type="button" role="tab" aria-selected="true" data-tab="einzel" class="cta-tab is-active">
           Herren Einzel
+        </button>
+        <button type="button" role="tab" aria-selected="false" data-tab="damen-einzel" class="cta-tab">
+          Damen Einzel
         </button>
         <button type="button" role="tab" aria-selected="false" data-tab="doppel" class="cta-tab">
           Herren Doppel
@@ -58,6 +62,10 @@ const stati = ['Alle', 'Offen', 'Terminiert', 'Gespielt'] as const;
       {gruppen.map((g) => <GruppenCard gruppe={g} />)}
     </section>
 
+    <section data-tabpanel="damen-einzel" class="space-y-5 sm:space-y-6" hidden>
+      {damenGruppen.map((g) => <GruppenCard gruppe={g} konkurrenz="damen" />)}
+    </section>
+
     <section data-tabpanel="doppel" hidden>
       <DoppelView />
     </section>
@@ -90,8 +98,9 @@ const stati = ['Alle', 'Offen', 'Terminiert', 'Gespielt'] as const;
         panels.forEach((p) => {
           p.hidden = p.dataset.tabpanel !== target;
         });
-        if (monatFilterBar) monatFilterBar.hidden = target !== 'einzel';
-        if (filterControls) filterControls.hidden = target !== 'einzel';
+        const showFilters = target === 'einzel' || target === 'damen-einzel';
+        if (monatFilterBar) monatFilterBar.hidden = !showFilters;
+        if (filterControls) filterControls.hidden = !showFilters;
       });
     });
 

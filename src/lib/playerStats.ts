@@ -1,7 +1,8 @@
 import doppelData from '../data/doppel.json';
 import einzelData from '../data/einzel.json';
+import damenEinzelData from '../data/damen-einzel.json';
 import spielerData from '../data/spieler.json';
-import { computeStandings, formatResult, matchStatus, type Match, type Spieler } from './standings';
+import { computeStandings, formatResult, matchStatus, type Konkurrenz, type Match, type Spieler } from './standings';
 
 export type DoppelMatch = {
   runde: string;
@@ -33,8 +34,22 @@ export type MatchPointBreakdown = {
 };
 
 const ALL_EINZEL_MATCHES = einzelData.matches as Match[];
+const ALL_DAMEN_EINZEL_MATCHES = damenEinzelData.matches as Match[];
 const ALL_DOPPEL_MATCHES = doppelData.matches as DoppelMatch[];
 const ALL_EINZEL_SPIELER = spielerData.einzel as Spieler[];
+const ALL_DAMEN_EINZEL_SPIELER = spielerData.damenEinzel as Spieler[];
+
+function einzelKonkurrenzOf(name: string): Konkurrenz | null {
+  if (ALL_EINZEL_SPIELER.some((s) => s.name === name)) return 'herren';
+  if (ALL_DAMEN_EINZEL_SPIELER.some((s) => s.name === name)) return 'damen';
+  return null;
+}
+
+function einzelMatchesOf(konkurrenz: Konkurrenz | null): Match[] {
+  if (konkurrenz === 'damen') return ALL_DAMEN_EINZEL_MATCHES;
+  if (konkurrenz === 'herren') return ALL_EINZEL_MATCHES;
+  return [...ALL_EINZEL_MATCHES, ...ALL_DAMEN_EINZEL_MATCHES];
+}
 
 function parseSet(set: string | null): { a: number; b: number } | null {
   if (!set) return null;
@@ -88,9 +103,13 @@ function doppelPlayers(doppel: string | null): string[] {
 
 export function getAllPlayerNames(): string[] {
   const doppelSpieler = ALL_DOPPEL_MATCHES.flatMap((m) => [...doppelPlayers(m.doppelA), ...doppelPlayers(m.doppelB)]);
-  return Array.from(new Set([...ALL_EINZEL_SPIELER.map((s) => s.name), ...doppelSpieler])).sort((a, b) =>
-    a.localeCompare(b, 'de'),
-  );
+  return Array.from(
+    new Set([
+      ...ALL_EINZEL_SPIELER.map((s) => s.name),
+      ...ALL_DAMEN_EINZEL_SPIELER.map((s) => s.name),
+      ...doppelSpieler,
+    ]),
+  ).sort((a, b) => a.localeCompare(b, 'de'));
 }
 
 export function getPlayerBySlug(slug: string): string | undefined {
@@ -98,7 +117,10 @@ export function getPlayerBySlug(slug: string): string | undefined {
 }
 
 export function getPlayerEinzelMatches(name: string): Match[] {
-  return ALL_EINZEL_MATCHES.filter((m) => m.spielerA === name || m.spielerB === name).sort((a, b) => a.gruppe - b.gruppe || a.nr - b.nr);
+  const konkurrenz = einzelKonkurrenzOf(name);
+  return einzelMatchesOf(konkurrenz)
+    .filter((m) => m.spielerA === name || m.spielerB === name)
+    .sort((a, b) => a.gruppe - b.gruppe || a.nr - b.nr);
 }
 
 export function getPlayerDoppelMatches(name: string): DoppelMatch[] {
@@ -151,8 +173,15 @@ export function explainMatchPoints(match: Match, name: string): MatchPointBreakd
 }
 
 export function getPlayerStats(name: string) {
-  const einzel = ALL_EINZEL_SPIELER.find((s) => s.name === name);
-  const standing = einzel ? computeStandings(einzel.gruppe).find((row) => row.name === name) : undefined;
+  const konkurrenz = einzelKonkurrenzOf(name);
+  const einzel =
+    konkurrenz === 'damen'
+      ? ALL_DAMEN_EINZEL_SPIELER.find((s) => s.name === name)
+      : ALL_EINZEL_SPIELER.find((s) => s.name === name);
+  const standing =
+    einzel && konkurrenz
+      ? computeStandings(einzel.gruppe, konkurrenz).find((row) => row.name === name)
+      : undefined;
   const einzelMatches = getPlayerEinzelMatches(name);
   const doppelMatches = getPlayerDoppelMatches(name);
   const breakdowns = einzelMatches.map((m) => explainMatchPoints(m, name)).filter((m): m is MatchPointBreakdown => Boolean(m));
