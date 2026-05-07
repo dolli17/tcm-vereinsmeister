@@ -1,18 +1,27 @@
 import doppelData from '../data/doppel.json';
 import einzelData from '../data/einzel.json';
 import damenEinzelData from '../data/damen-einzel.json';
+import mixedDoppelData from '../data/mixed-doppel.json';
 import spielerData from '../data/spieler.json';
 import { computeStandings, formatResult, matchStatus, type Konkurrenz, type Match, type Spieler } from './standings';
-
-// Bewusst NICHT eingebunden: mixed-doppel.json. Mixed-Doppel-Spiele und
-// Mixed-only Spielerinnen tauchen nicht in Spielerprofilen auf
-// (siehe auch MeineSpiele.astro).
 
 export type DoppelMatch = {
   runde: string;
   nr: number;
   doppelA: string | null;
   doppelB: string | null;
+  termin: string | null;
+  satz1: string | null;
+  satz2: string | null;
+  mtb: string | null;
+  sieger: 'A' | 'B' | null;
+};
+
+export type MixedMatch = {
+  runde: string;
+  nr: number;
+  teamA: string | null;
+  teamB: string | null;
   termin: string | null;
   satz1: string | null;
   satz2: string | null;
@@ -40,6 +49,21 @@ export type MatchPointBreakdown = {
 const ALL_EINZEL_MATCHES = einzelData.matches as Match[];
 const ALL_DAMEN_EINZEL_MATCHES = damenEinzelData.matches as Match[];
 const ALL_DOPPEL_MATCHES = doppelData.matches as DoppelMatch[];
+// Mixed-Doppel ist als KO-Baum strukturiert (runden[].matches[]); für die
+// Spielerprofile wird die Match-Liste flach gehalten und der Rundenname mitgeführt.
+const ALL_MIXED_MATCHES: MixedMatch[] = mixedDoppelData.runden.flatMap((runde) =>
+  runde.matches.map((m) => ({
+    runde: runde.name,
+    nr: m.nr,
+    teamA: m.teamA ?? null,
+    teamB: m.teamB ?? null,
+    termin: m.termin ?? null,
+    satz1: m.satz1 ?? null,
+    satz2: m.satz2 ?? null,
+    mtb: m.mtb ?? null,
+    sieger: (m.sieger ?? null) as 'A' | 'B' | null,
+  })),
+);
 const ALL_EINZEL_SPIELER = spielerData.einzel as Spieler[];
 const ALL_DAMEN_EINZEL_SPIELER = spielerData.damenEinzel as Spieler[];
 
@@ -101,19 +125,31 @@ export function slugifyPlayer(name: string): string {
     .replace(/^-|-$/g, '');
 }
 
-function doppelPlayers(doppel: string | null): string[] {
-  return doppel ? doppel.split('/').map((p) => p.trim()) : [];
+function teamPlayers(team: string | null): string[] {
+  if (!team || team === 'BYE') return [];
+  return team.split('/').map((p) => p.trim());
+}
+
+// Mixed-Doppel-Slots in späteren Runden enthalten Platzhalter wie
+// "Sieger Match 1" oder "Sieger Viertelfinale 2" bis ein Ergebnis feststeht.
+// Diese sollen nicht als Spielernamen behandelt werden.
+function isPlaceholderName(name: string): boolean {
+  return /^Sieger\s/i.test(name);
 }
 
 export function getAllPlayerNames(): string[] {
-  const doppelSpieler = ALL_DOPPEL_MATCHES.flatMap((m) => [...doppelPlayers(m.doppelA), ...doppelPlayers(m.doppelB)]);
+  const doppelSpieler = ALL_DOPPEL_MATCHES.flatMap((m) => [...teamPlayers(m.doppelA), ...teamPlayers(m.doppelB)]);
+  const mixedSpieler = ALL_MIXED_MATCHES.flatMap((m) => [...teamPlayers(m.teamA), ...teamPlayers(m.teamB)]);
   return Array.from(
     new Set([
       ...ALL_EINZEL_SPIELER.map((s) => s.name),
       ...ALL_DAMEN_EINZEL_SPIELER.map((s) => s.name),
       ...doppelSpieler,
+      ...mixedSpieler,
     ]),
-  ).sort((a, b) => a.localeCompare(b, 'de'));
+  )
+    .filter((n) => !isPlaceholderName(n))
+    .sort((a, b) => a.localeCompare(b, 'de'));
 }
 
 export function getPlayerBySlug(slug: string): string | undefined {
@@ -128,7 +164,11 @@ export function getPlayerEinzelMatches(name: string): Match[] {
 }
 
 export function getPlayerDoppelMatches(name: string): DoppelMatch[] {
-  return ALL_DOPPEL_MATCHES.filter((m) => [...doppelPlayers(m.doppelA), ...doppelPlayers(m.doppelB)].includes(name)).sort((a, b) => a.nr - b.nr);
+  return ALL_DOPPEL_MATCHES.filter((m) => [...teamPlayers(m.doppelA), ...teamPlayers(m.doppelB)].includes(name)).sort((a, b) => a.nr - b.nr);
+}
+
+export function getPlayerMixedMatches(name: string): MixedMatch[] {
+  return ALL_MIXED_MATCHES.filter((m) => [...teamPlayers(m.teamA), ...teamPlayers(m.teamB)].includes(name));
 }
 
 export function explainMatchPoints(match: Match, name: string): MatchPointBreakdown | null {
@@ -188,9 +228,12 @@ export function getPlayerStats(name: string) {
       : undefined;
   const einzelMatches = getPlayerEinzelMatches(name);
   const doppelMatches = getPlayerDoppelMatches(name);
+  const mixedMatches = getPlayerMixedMatches(name);
   const breakdowns = einzelMatches.map((m) => explainMatchPoints(m, name)).filter((m): m is MatchPointBreakdown => Boolean(m));
   const playedBreakdowns = breakdowns.filter((m) => m.status === 'gespielt');
   const doppelPlayed = doppelMatches.filter((m) => m.sieger === 'A' || m.sieger === 'B');
+  const mixedPlayed = mixedMatches.filter((m) => m.sieger === 'A' || m.sieger === 'B');
+  const mixedBye = mixedMatches.filter((m) => m.teamB === 'BYE');
 
   return {
     name,
@@ -199,6 +242,7 @@ export function getPlayerStats(name: string) {
     standing,
     einzelMatches,
     doppelMatches,
+    mixedMatches,
     breakdowns,
     playedBreakdowns,
     totals: {
@@ -209,13 +253,30 @@ export function getPlayerStats(name: string) {
       einzelBonus: playedBreakdowns.reduce((sum, m) => sum + m.bonus, 0),
       doppelGespielt: doppelPlayed.length,
       doppelOffen: doppelMatches.length - doppelPlayed.length,
+      mixedGespielt: mixedPlayed.length,
+      mixedOffen: mixedMatches.length - mixedPlayed.length - mixedBye.length,
+      mixedBye: mixedBye.length,
     },
   };
 }
 
 export function getDoppelTeam(match: DoppelMatch, name: string): { partner: string; opponent: string; team: string } {
-  const teamA = doppelPlayers(match.doppelA);
-  const teamB = doppelPlayers(match.doppelB);
+  const teamA = teamPlayers(match.doppelA);
+  const teamB = teamPlayers(match.doppelB);
+  const inA = teamA.includes(name);
+  const ownTeam = inA ? teamA : teamB;
+  const otherTeam = inA ? teamB : teamA;
+
+  return {
+    team: ownTeam.join(' / '),
+    partner: ownTeam.find((p) => p !== name) ?? 'ohne Partner',
+    opponent: otherTeam.length > 0 ? otherTeam.join(' / ') : 'Freilos',
+  };
+}
+
+export function getMixedTeam(match: MixedMatch, name: string): { partner: string; opponent: string; team: string } {
+  const teamA = teamPlayers(match.teamA);
+  const teamB = teamPlayers(match.teamB);
   const inA = teamA.includes(name);
   const ownTeam = inA ? teamA : teamB;
   const otherTeam = inA ? teamB : teamA;

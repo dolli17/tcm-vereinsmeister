@@ -2,12 +2,9 @@
 import einzelData from '../data/einzel.json';
 import damenEinzelData from '../data/damen-einzel.json';
 import doppelData from '../data/doppel.json';
+import mixedDoppelData from '../data/mixed-doppel.json';
 import spielerData from '../data/spieler.json';
 import { slugifyPlayer } from '../lib/playerStats';
-
-// Bewusst NICHT eingebunden: mixed-doppel.json. Mixed-Doppel-Spiele sollen
-// nicht im persönlichen Spielplan auftauchen — wer sie hier ergänzen will,
-// ändert damit die Produktentscheidung. Im Zweifel vorher abstimmen.
 
 type EinzelMatch = {
   nr: number;
@@ -34,20 +31,57 @@ type DoppelMatch = {
   sieger: 'A' | 'B' | null;
 };
 
+type MixedMatch = {
+  runde: string;
+  nr: number;
+  teamA: string | null;
+  teamB: string | null;
+  termin: string | null;
+  satz1: string | null;
+  satz2: string | null;
+  mtb: string | null;
+  sieger: 'A' | 'B' | null;
+};
+
 const einzelMatches = [
   ...(einzelData.matches as EinzelMatch[]).map((m) => ({ ...m, art: 'Einzel' as const })),
   ...(damenEinzelData.matches as EinzelMatch[]).map((m) => ({ ...m, art: 'Damen Einzel' as const })),
 ];
 const doppelMatches = doppelData.matches as DoppelMatch[];
+// Mixed-Doppel ist als KO-Baum strukturiert (runden[].matches[]); für die Suche
+// flachen wir auf eine Match-Liste runter und merken uns den Rundennamen am Match.
+const mixedMatches: MixedMatch[] = mixedDoppelData.runden.flatMap((runde) =>
+  runde.matches.map((m) => ({
+    runde: runde.name,
+    nr: m.nr,
+    teamA: m.teamA ?? null,
+    teamB: m.teamB ?? null,
+    termin: m.termin ?? null,
+    satz1: m.satz1 ?? null,
+    satz2: m.satz2 ?? null,
+    mtb: m.mtb ?? null,
+    sieger: (m.sieger ?? null) as 'A' | 'B' | null,
+  })),
+);
+
+function teamPlayers(team: string | null): string[] {
+  if (!team || team === 'BYE') return [];
+  return team.split('/').map((p) => p.trim());
+}
+
+// "Sieger Match 1", "Sieger Viertelfinale 2", … sind Bracket-Platzhalter,
+// keine echten Spielernamen — bei der Spielersuche ausblenden.
+const isPlaceholder = (name: string) => /^Sieger\s/i.test(name);
 
 const einzelSpieler = (spielerData.einzel as { name: string }[]).map((s) => s.name);
 const damenEinzelSpieler = (spielerData.damenEinzel as { name: string }[]).map((s) => s.name);
-const doppelSpieler = doppelMatches.flatMap((m) =>
-  [m.doppelA, m.doppelB].flatMap((d) => (d ? d.split('/').map((p) => p.trim()) : [])),
-);
-const spielerNamen = Array.from(new Set([...einzelSpieler, ...damenEinzelSpieler, ...doppelSpieler])).sort((a, b) =>
-  a.localeCompare(b, 'de'),
-);
+const doppelSpieler = doppelMatches.flatMap((m) => [...teamPlayers(m.doppelA), ...teamPlayers(m.doppelB)]);
+const mixedSpieler = mixedMatches.flatMap((m) => [...teamPlayers(m.teamA), ...teamPlayers(m.teamB)]);
+const spielerNamen = Array.from(
+  new Set([...einzelSpieler, ...damenEinzelSpieler, ...doppelSpieler, ...mixedSpieler]),
+)
+  .filter((n) => !isPlaceholder(n))
+  .sort((a, b) => a.localeCompare(b, 'de'));
 const spielerLinks = spielerNamen.map((name) => ({ name, slug: slugifyPlayer(name) }));
 ---
 
@@ -100,13 +134,13 @@ const spielerLinks = spielerNamen.map((name) => ({ name, slug: slugifyPlayer(nam
 
     <div class="border-t border-deep-ink/10 px-4 py-4 sm:px-6 sm:py-5" data-player-results>
       <p class="text-sm leading-relaxed text-muted">
-        Wähle einen Spieler aus, um alle Einzel- und Doppelmatches dieses Spielers zu sehen.
+        Wähle einen Spieler aus, um alle Einzel-, Doppel- und Mixed-Doppel-Matches dieses Spielers zu sehen.
       </p>
     </div>
   </div>
 </dialog>
 
-<script define:vars={{ einzelMatches, doppelMatches, spielerLinks }}>
+<script define:vars={{ einzelMatches, doppelMatches, mixedMatches, spielerLinks }}>
   const input = document.querySelector('[data-player-search]');
   const clearBtn = document.querySelector('[data-player-clear]');
   const results = document.querySelector('[data-player-results]');
@@ -114,8 +148,14 @@ const spielerLinks = spielerNamen.map((name) => ({ name, slug: slugifyPlayer(nam
   const closeBtn = document.querySelector('[data-player-close]');
   const dialog = document.querySelector('[data-player-dialog]');
 
-  function doppelPlayers(doppel) {
-    return doppel ? doppel.split('/').map((p) => p.trim()) : [];
+  function teamPlayers(team) {
+    if (!team || team === 'BYE') return [];
+    return team.split('/').map((p) => p.trim());
+  }
+
+  function teamLabel(team) {
+    if (!team || team === 'BYE') return 'Freilos';
+    return team;
   }
 
   function statusOf(match, hasOpponent = true) {
@@ -159,7 +199,7 @@ const spielerLinks = spielerNamen.map((name) => ({ name, slug: slugifyPlayer(nam
     if (!input || !results) return;
     const query = normalize(input.value);
     if (!query) {
-      results.innerHTML = '<p class="text-sm leading-relaxed text-muted">Wähle einen Spieler aus, um alle Einzel- und Doppelmatches dieses Spielers zu sehen.</p>';
+      results.innerHTML = '<p class="text-sm leading-relaxed text-muted">Wähle einen Spieler aus, um alle Einzel-, Doppel- und Mixed-Doppel-Matches dieses Spielers zu sehen.</p>';
       return;
     }
 
@@ -179,28 +219,34 @@ const spielerLinks = spielerNamen.map((name) => ({ name, slug: slugifyPlayer(nam
         };
       });
 
-    const doppel = doppelMatches
-      .filter((m) => [...doppelPlayers(m.doppelA), ...doppelPlayers(m.doppelB)].some((p) => normalize(p).includes(query)))
-      .map((m) => {
-        const teamA = doppelPlayers(m.doppelA);
-        const teamB = doppelPlayers(m.doppelB);
-        const selectedInA = teamA.some((p) => normalize(p).includes(query));
-        const ownTeam = selectedInA ? teamA : teamB;
-        const otherTeam = selectedInA ? teamB : teamA;
-        const partner = ownTeam.find((p) => !normalize(p).includes(query)) ?? 'ohne Partner';
-        const opponent = otherTeam.length > 0 ? otherTeam.join(' / ') : 'Freilos';
-        return {
-          art: 'Doppel',
-          context: m.runde,
-          number: `Match ${String(m.nr).padStart(2, '0')}`,
-          playerLine: `${m.doppelA ?? 'Freilos'} vs ${m.doppelB ?? 'Freilos'}`,
-          detail: `Partner: ${partner} · Gegner: ${opponent}${m.termin ? ` · Termin: ${m.termin}` : ''}`,
-          status: statusOf(m, Boolean(m.doppelB)),
-          result: resultOf(m),
-        };
-      });
+    function teamMatchCard(art, m, fieldA, fieldB) {
+      const teamA = teamPlayers(m[fieldA]);
+      const teamB = teamPlayers(m[fieldB]);
+      const selectedInA = teamA.some((p) => normalize(p).includes(query));
+      const ownTeam = selectedInA ? teamA : teamB;
+      const otherTeam = selectedInA ? teamB : teamA;
+      const partner = ownTeam.find((p) => !normalize(p).includes(query)) ?? 'ohne Partner';
+      const opponent = otherTeam.length > 0 ? otherTeam.join(' / ') : 'Freilos';
+      return {
+        art,
+        context: m.runde,
+        number: `Match ${String(m.nr).padStart(2, '0')}`,
+        playerLine: `${teamLabel(m[fieldA])} vs ${teamLabel(m[fieldB])}`,
+        detail: `Partner: ${partner} · Gegner: ${opponent}${m.termin ? ` · Termin: ${m.termin}` : ''}`,
+        status: statusOf(m, otherTeam.length > 0),
+        result: resultOf(m),
+      };
+    }
 
-    const items = [...einzel, ...doppel];
+    const doppel = doppelMatches
+      .filter((m) => [...teamPlayers(m.doppelA), ...teamPlayers(m.doppelB)].some((p) => normalize(p).includes(query)))
+      .map((m) => teamMatchCard('Doppel', m, 'doppelA', 'doppelB'));
+
+    const mixed = mixedMatches
+      .filter((m) => [...teamPlayers(m.teamA), ...teamPlayers(m.teamB)].some((p) => normalize(p).includes(query)))
+      .map((m) => teamMatchCard('Mixed Doppel', m, 'teamA', 'teamB'));
+
+    const items = [...einzel, ...doppel, ...mixed];
     if (items.length === 0) {
       results.innerHTML = '<p class="text-sm leading-relaxed text-muted">Keine Matches für diese Suche gefunden.</p>';
       return;
