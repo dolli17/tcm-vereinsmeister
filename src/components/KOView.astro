@@ -110,8 +110,9 @@ function matchStatus(match: Match): 'gespielt' | 'terminiert' | 'offen' | 'bye' 
                     {runde.matches.map((match) => {
                       const status = matchStatus(match);
                       const result = formatResult(match);
+                      const connectorHalf = roundIndex === 0 ? 0 : Math.max(28, gap / 2);
                       return (
-                        <article class={`plan-match ${status === 'bye' ? 'is-bye' : ''}`}>
+                        <article class={`plan-match ${status === 'bye' ? 'is-bye' : ''} ${roundIndex > 0 ? 'has-incoming' : ''}`} style={`--connector-half:${connectorHalf}px;`}>
                           <div class="plan-meta">
                             <span>Match {String(match.nr).padStart(2, '0')}</span>
                             <span>{status === 'gespielt' ? result : status === 'bye' ? 'BYE' : match.termin ?? 'offen'}</span>
@@ -179,6 +180,18 @@ function matchStatus(match: Match): 'gespielt' | 'terminiert' | 'offen' | 'bye' 
     right: -2.25rem;
     width: 2.25rem;
     border-top: 1.5px solid rgba(26, 31, 46, 0.24);
+  }
+
+  .plan-match.has-incoming::before {
+    content: '';
+    position: absolute;
+    top: calc(50% - var(--connector-half, 0px));
+    left: -2.25rem;
+    width: 2.25rem;
+    height: calc(var(--connector-half, 0px) * 2);
+    border-top: 1.5px solid rgba(26, 31, 46, 0.24);
+    border-bottom: 1.5px solid rgba(26, 31, 46, 0.24);
+    border-right: 1.5px solid rgba(26, 31, 46, 0.24);
   }
 
   .round-column:last-child .plan-match::after {
