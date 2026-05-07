@@ -4,6 +4,10 @@ import damenEinzelData from '../data/damen-einzel.json';
 import spielerData from '../data/spieler.json';
 import { computeStandings, formatResult, matchStatus, type Konkurrenz, type Match, type Spieler } from './standings';
 
+// Bewusst NICHT eingebunden: mixed-doppel.json. Mixed-Doppel-Spiele und
+// Mixed-only Spielerinnen tauchen nicht in Spielerprofilen auf
+// (siehe auch MeineSpiele.astro).
+
 export type DoppelMatch = {
   runde: string;
   nr: number;

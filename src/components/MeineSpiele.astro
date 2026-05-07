@@ -5,6 +5,10 @@ import doppelData from '../data/doppel.json';
 import spielerData from '../data/spieler.json';
 import { slugifyPlayer } from '../lib/playerStats';
 
+// Bewusst NICHT eingebunden: mixed-doppel.json. Mixed-Doppel-Spiele sollen
+// nicht im persönlichen Spielplan auftauchen — wer sie hier ergänzen will,
+// ändert damit die Produktentscheidung. Im Zweifel vorher abstimmen.
+
 type EinzelMatch = {
   nr: number;
   gruppe: number;

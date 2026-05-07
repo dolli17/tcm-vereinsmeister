@@ -33,6 +33,13 @@ const {
 
 const isEmpty = runden.length === 0 || runden.every((runde) => runde.matches.length === 0);
 
+// Bracket-Geometrie. Match-Höhe ist via .plan-team min-height fixiert,
+// damit padding-top und gap pro Runde exakt zwischen den vorigen Match-Mittelpunkten
+// landen. Wer hier dreht, muss auch die CSS-Werte unten anpassen.
+const MATCH_HEIGHT = 170; // px, plan-meta + 2 × plan-team (2-zeilig) + Borders
+const BASE_GAP = 20; // px, Abstand zwischen den Matches in Runde 1
+const PITCH = MATCH_HEIGHT + BASE_GAP; // Center-zu-Center-Distanz in Runde 1
+
 function isPlayed(match: Match): boolean {
   return match.sieger === 'A' || match.sieger === 'B';
 }
@@ -101,8 +108,15 @@ function matchStatus(match: Match): 'gespielt' | 'terminiert' | 'offen' | 'bye' 
           <div class="label-mono mb-4 text-club-blue">Turnierplan</div>
           <div class="tournament-grid">
             {runden.map((runde, roundIndex) => {
-              const topOffset = roundIndex === 0 ? 0 : 76 * (2 ** (roundIndex - 1));
-              const gap = roundIndex === 0 ? 20 : 62 + 78 * (2 ** (roundIndex - 1));
+              // Pitch verdoppelt sich pro Runde (jedes Match steht mittig zwischen
+              // den beiden Vorrunden-Matches): pitch_n = 2^n · pitch_0.
+              // Daraus folgen padding-top und gap fürs round-body:
+              //   topOffset_n = (2^n − 1) · pitch_0 / 2
+              //   gap_n       = 2^n · pitch_0 − match_height
+              const topOffset = roundIndex === 0 ? 0 : ((2 ** roundIndex - 1) * PITCH) / 2;
+              const gap = roundIndex === 0 ? BASE_GAP : 2 ** roundIndex * PITCH - MATCH_HEIGHT;
+              // Klammer-Höhe der eingehenden Verbindung = halbe Vorrunden-Pitch.
+              const connectorHalf = roundIndex === 0 ? 0 : (2 ** (roundIndex - 1) * PITCH) / 2;
               return (
                 <section class="round-column">
                   <header class="round-header">{runde.name}</header>
@@ -110,7 +124,6 @@ function matchStatus(match: Match): 'gespielt' | 'terminiert' | 'offen' | 'bye' 
                     {runde.matches.map((match) => {
                       const status = matchStatus(match);
                       const result = formatResult(match);
-                      const connectorHalf = roundIndex === 0 ? 0 : Math.max(28, gap / 2);
                       return (
                         <article class={`plan-match ${status === 'bye' ? 'is-bye' : ''} ${roundIndex > 0 ? 'has-incoming' : ''}`} style={`--connector-half:${connectorHalf}px;`}>
                           <div class="plan-meta">
@@ -212,6 +225,11 @@ function matchStatus(match: Match): 'gespielt' | 'terminiert' | 'offen' | 'bye' 
   }
 
   .plan-team {
+    /* Fixe min-height (2 Zeilen + Padding) hält die Match-Höhe konstant,
+       damit die Bracket-Mathematik (MATCH_HEIGHT in KOView.astro) aufgeht. */
+    display: flex;
+    align-items: center;
+    min-height: calc(2 * 1.28rem + 1.6rem);
     padding: 0.8rem 0.95rem;
     background: rgba(255, 255, 255, 0.98);
     color: var(--color-deep-ink);
