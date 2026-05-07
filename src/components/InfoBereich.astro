@@ -117,6 +117,40 @@
         </div>
       </section>
     </div>
+
+    <div data-info-content="mixed" class="grid gap-5" hidden>
+      <section>
+        <div class="label-mono text-court-red">Knock-out-Phase</div>
+        <div class="mt-3 grid gap-3 text-sm leading-relaxed text-muted sm:text-[15px]">
+          <p>
+            Das Mixed Doppel wird direkt als KO-Turnier gespielt. Es gibt keine Gruppenphase:
+            Siegerpaare ruecken in die naechste Runde vor, Verlierer scheiden aus.
+          </p>
+          <p>
+            Die Setzung erfolgt nach der addierten LK der beiden Partner. Je niedriger die Summe,
+            desto hoeher die Setzung.
+          </p>
+          <p>
+            Bei 11 Paarungen wird ein 16er-Feld gespielt. Dadurch entstehen 5 Freilose in Runde 1,
+            die an die topgesetzten Paarungen gehen.
+          </p>
+        </div>
+      </section>
+
+      <section class="border-t border-deep-ink/10 pt-4">
+        <div class="label-mono text-court-red">Wichtig</div>
+        <div class="mt-3 grid gap-3 text-sm leading-relaxed text-muted sm:text-[15px]">
+          <p>
+            Die 1. Runde ist im Mai zu spielen. Termine stimmt ihr selbststaendig ab und meldet sie
+            vor dem Spiel dem Sportwart.
+          </p>
+          <p>
+            Nach jedem Match wird der Turnierbaum mit dem Ergebnis aktualisiert, damit die naechste
+            Runde festgelegt werden kann.
+          </p>
+        </div>
+      </section>
+    </div>
   </div>
 </dialog>
 
@@ -129,16 +163,22 @@
   const title = document.querySelector<HTMLElement>('[data-dialog-title]');
   const contents = document.querySelectorAll<HTMLElement>('[data-info-content]');
 
-  function activeTab(): 'einzel' | 'doppel' {
+  function activeTab(): 'einzel' | 'doppel' | 'mixed' {
     const active = document.querySelector<HTMLButtonElement>('[data-tab].is-active');
-    return active?.dataset.tab === 'doppel' ? 'doppel' : 'einzel';
+    if (active?.dataset.tab === 'doppel') return 'doppel';
+    if (active?.dataset.tab === 'mixed') return 'mixed';
+    return 'einzel';
   }
 
-  function setInfoMode(mode: 'einzel' | 'doppel') {
-    const isDoppel = mode === 'doppel';
-    currentLabel!.textContent = isDoppel ? 'Herren Doppel' : 'Herren Einzel';
-    kicker!.textContent = isDoppel ? 'Herren Doppel' : 'Herren Einzel';
-    title!.textContent = isDoppel ? 'Info zur Knock-out-Phase' : 'Info & Punktesystem';
+  function setInfoMode(mode: 'einzel' | 'doppel' | 'mixed') {
+    const labels = {
+      einzel: 'Herren Einzel',
+      doppel: 'Herren Doppel',
+      mixed: 'Mixed Doppel',
+    } as const;
+    currentLabel!.textContent = labels[mode];
+    kicker!.textContent = labels[mode];
+    title!.textContent = mode === 'einzel' ? 'Info & Punktesystem' : 'Info zur Knock-out-Phase';
     contents.forEach((content) => {
       content.hidden = content.dataset.infoContent !== mode;
     });
@@ -174,7 +214,8 @@
 
   document.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((tab) => {
     tab.addEventListener('click', () => {
-      setInfoMode(tab.dataset.tab === 'doppel' ? 'doppel' : 'einzel');
+      const mode = tab.dataset.tab === 'doppel' ? 'doppel' : tab.dataset.tab === 'mixed' ? 'mixed' : 'einzel';
+      setInfoMode(mode);
     });
   });
 </script>
