@@ -5,6 +5,7 @@ import InfoBereich from '../components/InfoBereich.astro';
 import MeineSpiele from '../components/MeineSpiele.astro';
 import GruppenCard from '../components/GruppenCard.astro';
 import DoppelView from '../components/DoppelView.astro';
+import MixedDoppelView from '../components/MixedDoppelView.astro';
 import { getGruppen } from '../lib/standings';
 
 const gruppen = getGruppen();
@@ -17,16 +18,19 @@ const stati = ['Alle', 'Offen', 'Terminiert', 'Gespielt'] as const;
 
   <nav class="sticky top-0 z-20 border-b border-deep-ink/10 bg-warm-sand/95 shadow-[0_8px_24px_-22px_rgba(26,31,46,0.65)] backdrop-blur-sm">
     <div class="mx-auto max-w-5xl px-4 sm:px-8">
-      <div role="tablist" aria-label="Konkurrenzen" class="grid grid-cols-2 gap-1 pt-2 sm:flex sm:pt-3">
+      <div role="tablist" aria-label="Konkurrenzen" class="grid grid-cols-3 gap-1 pt-2 sm:flex sm:pt-3">
         <button type="button" role="tab" aria-selected="true" data-tab="einzel" class="cta-tab is-active">
           Herren Einzel
         </button>
         <button type="button" role="tab" aria-selected="false" data-tab="doppel" class="cta-tab">
           Herren Doppel
         </button>
+        <button type="button" role="tab" aria-selected="false" data-tab="mixed" class="cta-tab">
+          Mixed Doppel
+        </button>
       </div>
 
-      <div class="grid gap-2 py-2.5 sm:py-3">
+      <div data-filter-controls class="grid gap-2 py-2.5 sm:py-3">
         <div data-monat-filter-bar class="-mx-1 flex gap-1 overflow-x-auto no-scrollbar">
           {monate.map((m) => (
             <button type="button" data-monat-filter={m} class={`cta-filter ${m === 'Alle' ? 'is-active' : ''}`}>
@@ -58,6 +62,10 @@ const stati = ['Alle', 'Offen', 'Terminiert', 'Gespielt'] as const;
       <DoppelView />
     </section>
 
+    <section data-tabpanel="mixed" hidden>
+      <MixedDoppelView />
+    </section>
+
     <footer class="mt-12 border-t border-deep-ink/10 pt-6 text-center">
       <div class="label-mono text-muted-2">TC Muckensturm</div>
       <p class="mt-2 font-mono text-[11px] text-muted-2">
@@ -70,6 +78,7 @@ const stati = ['Alle', 'Offen', 'Terminiert', 'Gespielt'] as const;
     const tabs = document.querySelectorAll<HTMLButtonElement>('[data-tab]');
     const panels = document.querySelectorAll<HTMLElement>('[data-tabpanel]');
     const monatFilterBar = document.querySelector<HTMLElement>('[data-monat-filter-bar]');
+    const filterControls = document.querySelector<HTMLElement>('[data-filter-controls]');
     tabs.forEach((btn) => {
       btn.addEventListener('click', () => {
         const target = btn.dataset.tab;
@@ -81,7 +90,8 @@ const stati = ['Alle', 'Offen', 'Terminiert', 'Gespielt'] as const;
         panels.forEach((p) => {
           p.hidden = p.dataset.tabpanel !== target;
         });
-        if (monatFilterBar) monatFilterBar.hidden = target === 'doppel';
+        if (monatFilterBar) monatFilterBar.hidden = target !== 'einzel';
+        if (filterControls) filterControls.hidden = target !== 'einzel';
       });
     });
 

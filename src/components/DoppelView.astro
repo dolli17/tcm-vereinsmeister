@@ -1,141 +1,23 @@
 ---
 import doppelData from '../data/doppel.json';
+import KOView from './KOView.astro';
 
-type DoppelMatch = {
-  runde: string;
-  nr: number;
-  doppelA: string | null;
-  doppelB: string | null;
-  termin: string | null;
-  satz1: string | null;
-  satz2: string | null;
-  mtb: string | null;
-  sieger: 'A' | 'B' | null;
-};
-
-const matches = (doppelData.matches as DoppelMatch[]) ?? [];
-const isEmpty = matches.length === 0;
-
-const runden = Array.from(new Set(matches.map((m) => m.runde)));
-const aktuelleRunde = runden[0] ?? 'Aktuelle Runde';
-
-function isPlayed(match: DoppelMatch): boolean {
-  return match.sieger === 'A' || match.sieger === 'B';
-}
-
-function formatResult(match: DoppelMatch): string {
-  const parts = [match.satz1, match.satz2, match.mtb].filter(Boolean);
-  return parts.join(' · ');
-}
-
-function matchStatus(match: DoppelMatch): 'freilos' | 'gespielt' | 'terminiert' | 'offen' {
-  if (!match.doppelB) return 'freilos';
-  if (isPlayed(match)) return 'gespielt';
-  if (match.termin) return 'terminiert';
-  return 'offen';
-}
-
-function playersOfDoppel(doppel: string | null): string[] {
-  return doppel ? doppel.split('/').map((p) => p.trim()) : [];
-}
+const matches = (doppelData.matches ?? []).map((match) => ({
+  nr: match.nr,
+  teamA: match.doppelA,
+  teamB: match.doppelB,
+  termin: match.termin,
+  satz1: match.satz1,
+  satz2: match.satz2,
+  mtb: match.mtb,
+  sieger: match.sieger,
+}));
 ---
 
-{isEmpty ? (
-  <div class="rounded-sm border border-dashed border-deep-ink/15 bg-white/40 p-8 text-center sm:p-12">
-    <div class="label-mono text-court-red">KO-Baum</div>
-    <h2 class="mt-3 font-serif text-2xl text-deep-ink sm:text-3xl">Auslosung folgt</h2>
-    <p class="mx-auto mt-3 max-w-md text-sm text-muted">
-      Die Auslosung des Herren Doppels ab dem Sechzehntelfinale wird hier veröffentlicht, sobald sie vorliegt.
-    </p>
-  </div>
-) : (
-  <div class="space-y-5 sm:space-y-6">
-    <section class="rounded-sm border border-club-blue/25 bg-white/60 px-4 py-3.5 shadow-[0_10px_34px_-30px_rgba(26,31,46,0.55)] backdrop-blur-sm sm:px-6">
-      <div class="label-mono text-club-blue">Aktuelle Runde</div>
-      <p class="mt-1.5 text-sm leading-relaxed text-muted sm:text-[15px]">
-        Die {aktuelleRunde} im Herren Doppel ist im Mai zu spielen. Bitte stimmt eure Termine selbstständig
-        ab und meldet sie vor dem Spiel dem Sportwart.
-      </p>
-    </section>
-
-    {runden.map((runde) => {
-      const rundenMatches = matches.filter((m) => m.runde === runde).sort((a, b) => a.nr - b.nr);
-      const gespielt = rundenMatches.filter(isPlayed).length;
-      const isAktuelleRunde = runde === aktuelleRunde;
-
-      return (
-        <section class="overflow-hidden rounded-sm border border-deep-ink/10 bg-white/60 shadow-[0_10px_34px_-30px_rgba(26,31,46,0.55)] backdrop-blur-sm">
-          <header class="flex items-baseline justify-between gap-3 border-b border-deep-ink/10 bg-warm-sand-2/40 px-3.5 py-3.5 sm:px-6">
-            <div>
-              <div class="label-mono text-club-blue">{runde}</div>
-              <div class="mt-0.5 font-mono text-[11px] text-muted-2">
-                {rundenMatches.length} Matches · {gespielt} gespielt{isAktuelleRunde ? ' · im Mai zu spielen' : ''}
-              </div>
-            </div>
-            <div class="label-mono text-court-red">Herren Doppel</div>
-          </header>
-
-          <div class="divide-y divide-deep-ink/8">
-            {rundenMatches.map((match) => {
-              const status = matchStatus(match);
-              const winnerIsA = match.sieger === 'A' || status === 'freilos';
-              const winnerIsB = match.sieger === 'B';
-              const result = formatResult(match);
-
-              return (
-                <article
-                  class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 px-3 py-3.5 sm:grid-cols-[auto_1fr_auto] sm:items-center sm:gap-4 sm:px-5"
-                  data-match-row
-                  data-status={status}
-                  data-players={[...playersOfDoppel(match.doppelA), ...playersOfDoppel(match.doppelB)].join('|')}
-                >
-                  <div class="font-mono text-[11px] tabular-nums text-muted-2">
-                    {String(match.nr).padStart(2, '0')}
-                  </div>
-
-                  <div class="min-w-0">
-                    <div class="grid gap-1.5 sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-3">
-                      <div class={`min-w-0 ${winnerIsA ? 'text-deep-ink' : winnerIsB ? 'text-muted-2' : 'text-deep-ink'}`}>
-                        <div class={`truncate text-[15px] leading-tight ${winnerIsA ? 'font-semibold' : ''}`}>
-                          {match.doppelA}
-                        </div>
-                      </div>
-
-                      <div class="hidden font-mono text-[10px] uppercase tracking-wider text-muted-2 sm:block">vs</div>
-
-                      <div class={`min-w-0 ${winnerIsB ? 'text-deep-ink' : winnerIsA ? 'text-muted-2' : 'text-deep-ink'}`}>
-                        <div class={`truncate text-[15px] leading-tight ${winnerIsB ? 'font-semibold' : ''}`}>
-                          {match.doppelB ?? 'Freilos'}
-                        </div>
-                      </div>
-                    </div>
-
-                    {match.termin && status !== 'gespielt' && (
-                      <div class="mt-1 font-mono text-[10px] uppercase tracking-wider text-muted-2">
-                        Termin · {match.termin}
-                      </div>
-                    )}
-                  </div>
-
-                  <div class="col-start-2 text-left sm:col-start-auto sm:text-right">
-                    {status === 'gespielt' ? (
-                      <span class="font-mono text-[12px] tabular-nums text-deep-ink sm:text-[13px]">
-                        {result}
-                      </span>
-                    ) : status === 'terminiert' ? (
-                      <span class="label-mono text-club-blue">terminiert</span>
-                    ) : status === 'freilos' ? (
-                      <span class="label-mono text-court-red">Freilos</span>
-                    ) : (
-                      <span class="label-mono text-muted-2">offen</span>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-      );
-    })}
-  </div>
-)}
+<KOView
+  headline="Herren Doppel"
+  konkurrenzLabel="Herren Doppel"
+  aktuelleRunde="1. Runde"
+  hinweis="Die 1. Runde im Herren Doppel ist im Mai zu spielen. Bitte stimmt eure Termine selbstständig ab und meldet sie vor dem Spiel dem Sportwart."
+  runden={[{ name: '1. Runde', matches }]}
+/>

@@ -1,0 +1,127 @@
+{
+  "headline": "Mixed Doppel",
+  "aktuelleRunde": "1. Runde",
+  "hinweis": "Die 1. Runde im Mixed Doppel ist im Mai zu spielen. Bitte stimmt eure Termine selbstständig ab und meldet sie vor dem Spiel dem Sportwart.",
+  "runden": [
+    {
+      "name": "1. Runde",
+      "matches": [
+        {
+          "nr": 1,
+          "teamA": "Olena Golubenko / Ladislav Virag",
+          "teamB": "Branimir Sunjic / Sandra Sunjic",
+          "termin": null,
+          "satz1": null,
+          "satz2": null,
+          "mtb": null,
+          "sieger": null
+        },
+        {
+          "nr": 2,
+          "teamA": "Tim Strohm / Manuela Strohm",
+          "teamB": "Sonja Knopp / Leonel Goncalves Mendes",
+          "termin": null,
+          "satz1": null,
+          "satz2": null,
+          "mtb": null,
+          "sieger": null
+        },
+        {
+          "nr": 3,
+          "teamA": "Julia Ilzhöfer / Wolfgang Putschky",
+          "teamB": "Jenny Fischer / Georg Fischer",
+          "termin": null,
+          "satz1": null,
+          "satz2": null,
+          "mtb": null,
+          "sieger": null
+        }
+      ]
+    },
+    {
+      "name": "Viertelfinale",
+      "matches": [
+        {
+          "nr": 1,
+          "teamA": "Lucas Dollmann / Ana Sunjic",
+          "teamB": "Sieger Match 1",
+          "termin": null,
+          "satz1": null,
+          "satz2": null,
+          "mtb": null,
+          "sieger": null
+        },
+        {
+          "nr": 2,
+          "teamA": "Julia Skatulla / Gregor Skatulla",
+          "teamB": "Moritz Schich / Paula Kaufmann",
+          "termin": null,
+          "satz1": null,
+          "satz2": null,
+          "mtb": null,
+          "sieger": null
+        },
+        {
+          "nr": 3,
+          "teamA": "Julia Maier / Chris Fiedler",
+          "teamB": "Sieger Match 2",
+          "termin": null,
+          "satz1": null,
+          "satz2": null,
+          "mtb": null,
+          "sieger": null
+        },
+        {
+          "nr": 4,
+          "teamA": "Lisa Rühl / Nick Klenk",
+          "teamB": "Sieger Match 3",
+          "termin": null,
+          "satz1": null,
+          "satz2": null,
+          "mtb": null,
+          "sieger": null
+        }
+      ]
+    },
+    {
+      "name": "Halbfinale",
+      "matches": [
+        {
+          "nr": 1,
+          "teamA": "Sieger Viertelfinale 1",
+          "teamB": "Sieger Viertelfinale 2",
+          "termin": null,
+          "satz1": null,
+          "satz2": null,
+          "mtb": null,
+          "sieger": null
+        },
+        {
+          "nr": 2,
+          "teamA": "Sieger Viertelfinale 3",
+          "teamB": "Sieger Viertelfinale 4",
+          "termin": null,
+          "satz1": null,
+          "satz2": null,
+          "mtb": null,
+          "sieger": null
+        }
+      ]
+    },
+    {
+      "name": "Finale",
+      "matches": [
+        {
+          "nr": 1,
+          "teamA": "Sieger Halbfinale 1",
+          "teamB": "Sieger Halbfinale 2",
+          "termin": null,
+          "satz1": null,
+          "satz2": null,
+          "mtb": null,
+          "sieger": null
+        }
+      ]
+    }
+  ]
+}
