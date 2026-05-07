@@ -2,6 +2,7 @@
 import einzelData from '../data/einzel.json';
 import damenEinzelData from '../data/damen-einzel.json';
 import doppelData from '../data/doppel.json';
+import damenDoppelData from '../data/damen-doppel.json';
 import mixedDoppelData from '../data/mixed-doppel.json';
 import spielerData from '../data/spieler.json';
 import { slugifyPlayer } from '../lib/playerStats';
@@ -47,7 +48,12 @@ const einzelMatches = [
   ...(einzelData.matches as EinzelMatch[]).map((m) => ({ ...m, art: 'Einzel' as const })),
   ...(damenEinzelData.matches as EinzelMatch[]).map((m) => ({ ...m, art: 'Damen Einzel' as const })),
 ];
-const doppelMatches = doppelData.matches as DoppelMatch[];
+// Herren- und Damen-Doppel teilen die Felder (doppelA/doppelB); für die Such-
+// Card unterscheiden wir nur über das art-Label.
+const doppelMatches = [
+  ...(doppelData.matches as DoppelMatch[]).map((m) => ({ ...m, art: 'Doppel' as const })),
+  ...(damenDoppelData.matches as DoppelMatch[]).map((m) => ({ ...m, art: 'Damen Doppel' as const })),
+];
 // Mixed-Doppel ist als KO-Baum strukturiert (runden[].matches[]); für die Suche
 // flachen wir auf eine Match-Liste runter und merken uns den Rundennamen am Match.
 const mixedMatches: MixedMatch[] = mixedDoppelData.runden.flatMap((runde) =>
@@ -240,7 +246,7 @@ const spielerLinks = spielerNamen.map((name) => ({ name, slug: slugifyPlayer(nam
 
     const doppel = doppelMatches
       .filter((m) => [...teamPlayers(m.doppelA), ...teamPlayers(m.doppelB)].some((p) => normalize(p).includes(query)))
-      .map((m) => teamMatchCard('Doppel', m, 'doppelA', 'doppelB'));
+      .map((m) => teamMatchCard(m.art, m, 'doppelA', 'doppelB'));
 
     const mixed = mixedMatches
       .filter((m) => [...teamPlayers(m.teamA), ...teamPlayers(m.teamB)].some((p) => normalize(p).includes(query)))

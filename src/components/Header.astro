@@ -1,6 +1,7 @@
 ---
 import { getAllMatches, isMatchPlayed } from '../lib/standings';
 import doppelData from '../data/doppel.json';
+import damenDoppelData from '../data/damen-doppel.json';
 import mixedDoppelData from '../data/mixed-doppel.json';
 
 // Soll-Gesamtanzahl pro Konkurrenz (Gruppe + komplette KO-Phase ohne Spiel
@@ -20,11 +21,13 @@ const isMatchEntryPlayed = (m: { sieger: 'A' | 'B' | null }) => m.sieger === 'A'
 const herrenEinzelPlayed = getAllMatches(undefined, 'herren').filter(isMatchPlayed).length;
 const damenEinzelPlayed = getAllMatches(undefined, 'damen').filter(isMatchPlayed).length;
 const herrenDoppelPlayed = doppelData.matches.filter(isMatchEntryPlayed).length;
+const damenDoppelPlayed = damenDoppelData.matches.filter(isMatchEntryPlayed).length;
 const mixedDoppelPlayed = mixedDoppelData.runden
   .flatMap((r) => r.matches)
   .filter(isMatchEntryPlayed).length;
 
-const gespielt = herrenEinzelPlayed + damenEinzelPlayed + herrenDoppelPlayed + mixedDoppelPlayed;
+const gespielt =
+  herrenEinzelPlayed + damenEinzelPlayed + herrenDoppelPlayed + damenDoppelPlayed + mixedDoppelPlayed;
 ---
 
 <header class="border-b border-deep-ink/10 bg-warm-sand">

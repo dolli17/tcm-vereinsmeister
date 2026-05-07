@@ -1,4 +1,5 @@
 import doppelData from '../data/doppel.json';
+import damenDoppelData from '../data/damen-doppel.json';
 import einzelData from '../data/einzel.json';
 import damenEinzelData from '../data/damen-einzel.json';
 import mixedDoppelData from '../data/mixed-doppel.json';
@@ -48,7 +49,12 @@ export type MatchPointBreakdown = {
 
 const ALL_EINZEL_MATCHES = einzelData.matches as Match[];
 const ALL_DAMEN_EINZEL_MATCHES = damenEinzelData.matches as Match[];
-const ALL_DOPPEL_MATCHES = doppelData.matches as DoppelMatch[];
+// Herren- und Damen-Doppel teilen das DoppelMatch-Schema (doppelA / doppelB);
+// Spieler:innen kommen disjunkt vor, daher kann man die Listen zusammenwerfen.
+const ALL_DOPPEL_MATCHES = [
+  ...(doppelData.matches as DoppelMatch[]),
+  ...(damenDoppelData.matches as DoppelMatch[]),
+];
 // Mixed-Doppel ist als KO-Baum strukturiert (runden[].matches[]); für die
 // Spielerprofile wird die Match-Liste flach gehalten und der Rundenname mitgeführt.
 const ALL_MIXED_MATCHES: MixedMatch[] = mixedDoppelData.runden.flatMap((runde) =>

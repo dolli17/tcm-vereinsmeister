@@ -1,0 +1,48 @@
+{
+  "matches": [
+    {
+      "runde": "1. Runde",
+      "nr": 1,
+      "doppelA": "Anna-Sophia Utermann / Stefanie Tauer",
+      "doppelB": "Katja Herkle / Ilona Jäggle",
+      "termin": null,
+      "satz1": null,
+      "satz2": null,
+      "mtb": null,
+      "sieger": null
+    },
+    {
+      "runde": "1. Runde",
+      "nr": 2,
+      "doppelA": "Olena Golubenko / Sandra Sunjic",
+      "doppelB": "Sonja Knopp / Jenny Fischer",
+      "termin": null,
+      "satz1": null,
+      "satz2": null,
+      "mtb": null,
+      "sieger": null
+    },
+    {
+      "runde": "1. Runde",
+      "nr": 3,
+      "doppelA": "Lisa Rühl / Julia Maier",
+      "doppelB": "Annette Jonas / Maren Kreft",
+      "termin": null,
+      "satz1": null,
+      "satz2": null,
+      "mtb": null,
+      "sieger": null
+    },
+    {
+      "runde": "1. Runde",
+      "nr": 4,
+      "doppelA": "Franziska Borst / Manuela Wältl",
+      "doppelB": "Ana Sunjic / Julia Skatulla",
+      "termin": null,
+      "satz1": null,
+      "satz2": null,
+      "mtb": null,
+      "sieger": null
+    }
+  ]
+}
