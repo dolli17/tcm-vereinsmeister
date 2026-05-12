@@ -51,7 +51,7 @@
     { "nr": 6, "gruppe": 6, "monat": "Juli", "spielerA": "Lorenz King", "spielerB": "Tom Kindermann", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
 
     { "nr": 1, "gruppe": 7, "monat": "Mai", "spielerA": "Tim Schaich", "spielerB": "Tim Strohm", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
-    { "nr": 2, "gruppe": 7, "monat": "Mai", "spielerA": "Carsten Rose", "spielerB": "Adel Thaaer", "termin": "Di 12.05. 18:30", "satz1": null, "satz2": null, "mtb": null, "sieger": null },
+    { "nr": 2, "gruppe": 7, "monat": "Mai", "spielerA": "Carsten Rose", "spielerB": "Adel Thaaer", "termin": "Di 12.05. 18:30", "satz1": "1:6", "satz2": "0:6", "mtb": null, "sieger": "B" },
     { "nr": 3, "gruppe": 7, "monat": "Mai", "spielerA": "Maximilian Fischer", "spielerB": "Tim Strohm", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 4, "gruppe": 7, "monat": "Juni", "spielerA": "Tim Schaich", "spielerB": "Carsten Rose", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 5, "gruppe": 7, "monat": "Juni", "spielerA": "Maximilian Fischer", "spielerB": "Adel Thaaer", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
