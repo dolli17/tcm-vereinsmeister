@@ -1,4 +1,6 @@
 ---
+import telefonnummern from '../data/telefonnummern.json';
+
 type Match = {
   nr: number;
   teamA: string | null;
@@ -13,6 +15,11 @@ type Match = {
 type Runde = {
   name: string;
   matches: Match[];
+};
+
+type TeamPlayer = {
+  name: string;
+  telefon?: string;
 };
 
 interface Props {
@@ -31,6 +38,7 @@ const {
   konkurrenzLabel = headline,
 } = Astro.props;
 
+const phoneMap = telefonnummern as Record<string, string>;
 const isEmpty = runden.length === 0 || runden.every((runde) => runde.matches.length === 0);
 
 // Bracket-Geometrie. Match-Höhe ist via .plan-team min-height fixiert,
@@ -53,6 +61,28 @@ function matchStatus(match: Match): 'gespielt' | 'terminiert' | 'offen' | 'bye' 
   if (isPlayed(match)) return 'gespielt';
   if (match.termin) return 'terminiert';
   return 'offen';
+}
+
+function whatsappHref(telefon: string): string {
+  const digits = telefon.replace(/\D/g, '');
+  const internationalNumber = digits.startsWith('00')
+    ? digits.slice(2)
+    : digits.startsWith('0')
+      ? `49${digits.slice(1)}`
+      : digits;
+  const text = encodeURIComponent('Hallo, ich melde mich wegen der Vereinsmeisterschaft.');
+  return `https://wa.me/${internationalNumber}?text=${text}`;
+}
+
+function getTeamPlayers(team: string | null): TeamPlayer[] {
+  if (!team || team === 'BYE' || team === 'TBD') return [];
+  return team.split('/').map((part) => {
+    const name = part.trim();
+    return {
+      name,
+      telefon: phoneMap[name],
+    };
+  });
 }
 ---
 
@@ -87,11 +117,51 @@ function matchStatus(match: Match): 'gespielt' | 'terminiert' | 'offen' | 'bye' 
                   </div>
                   <div class="mt-2 space-y-2">
                     <div class={`rounded-sm border px-3 py-2 ${match.sieger === 'A' || status === 'bye' ? 'border-deep-ink/20 bg-warm-sand-2/55 font-semibold text-deep-ink' : 'border-deep-ink/10 bg-white/65 text-deep-ink'}`}>
-                      {match.teamA ?? 'TBD'}
+                      {(match.teamA && match.teamA !== 'BYE') ? (
+                        <div class="team-players">
+                          {getTeamPlayers(match.teamA).map((player) => (
+                            <div class="team-player-row">
+                              <span class="truncate">{player.name}</span>
+                              {player.telefon && (
+                                <span class="contact-actions">
+                                  <a class="contact-link contact-link-whatsapp" href={whatsappHref(player.telefon)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp an ${player.name} öffnen`} title={`WhatsApp an ${player.name} öffnen`}>
+                                    <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M5.2 15.1 3 17l.7-2.8A7 7 0 1 1 5.2 15.1Z" /><path d="M7.2 6.9c.2-.4.4-.5.7-.5h.5c.2 0 .4.1.5.4l.5 1.2c.1.3 0 .5-.2.7l-.4.4c.5.9 1.2 1.6 2.1 2.1l.4-.4c.2-.2.5-.3.7-.2l1.2.5c.3.1.4.3.4.6v.5c0 .3-.2.5-.5.7-.6.3-1.3.3-2.2 0-1.8-.6-3.7-2.5-4.3-4.3-.3-.8-.3-1.5 0-2.1Z" /></svg>
+                                  </a>
+                                  <button class="contact-link contact-link-number" type="button" data-phone-open data-phone-name={player.name} data-phone-number={player.telefon} aria-label={`Telefonnummer von ${player.name} anzeigen`} title={`Telefonnummer von ${player.name} anzeigen`}>
+                                    <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M7.1 4.1 8.3 6.7 7 8c.6 1.5 1.7 2.7 3.1 3.1l1.3-1.3 2.6 1.2-.2 2.2c0 .5-.4.9-.9.9-4.4-.1-8-3.7-8.1-8.1 0-.5.4-.9.9-.9l2.4-.1Z" /><path d="M12.4 4.4h2.9v2.9" /><path d="m11.7 8 3.5-3.5" /></svg>
+                                  </button>
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        match.teamA ?? 'TBD'
+                      )}
                     </div>
                     <div class="px-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-2">vs</div>
                     <div class={`rounded-sm border px-3 py-2 ${match.sieger === 'B' ? 'border-deep-ink/20 bg-warm-sand-2/55 font-semibold text-deep-ink' : 'border-deep-ink/10 bg-white/65 text-deep-ink'}`}>
-                      {match.teamB ?? 'TBD'}
+                      {(match.teamB && match.teamB !== 'BYE') ? (
+                        <div class="team-players">
+                          {getTeamPlayers(match.teamB).map((player) => (
+                            <div class="team-player-row">
+                              <span class="truncate">{player.name}</span>
+                              {player.telefon && (
+                                <span class="contact-actions">
+                                  <a class="contact-link contact-link-whatsapp" href={whatsappHref(player.telefon)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp an ${player.name} öffnen`} title={`WhatsApp an ${player.name} öffnen`}>
+                                    <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M5.2 15.1 3 17l.7-2.8A7 7 0 1 1 5.2 15.1Z" /><path d="M7.2 6.9c.2-.4.4-.5.7-.5h.5c.2 0 .4.1.5.4l.5 1.2c.1.3 0 .5-.2.7l-.4.4c.5.9 1.2 1.6 2.1 2.1l.4-.4c.2-.2.5-.3.7-.2l1.2.5c.3.1.4.3.4.6v.5c0 .3-.2.5-.5.7-.6.3-1.3.3-2.2 0-1.8-.6-3.7-2.5-4.3-4.3-.3-.8-.3-1.5 0-2.1Z" /></svg>
+                                  </a>
+                                  <button class="contact-link contact-link-number" type="button" data-phone-open data-phone-name={player.name} data-phone-number={player.telefon} aria-label={`Telefonnummer von ${player.name} anzeigen`} title={`Telefonnummer von ${player.name} anzeigen`}>
+                                    <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M7.1 4.1 8.3 6.7 7 8c.6 1.5 1.7 2.7 3.1 3.1l1.3-1.3 2.6 1.2-.2 2.2c0 .5-.4.9-.9.9-4.4-.1-8-3.7-8.1-8.1 0-.5.4-.9.9-.9l2.4-.1Z" /><path d="M12.4 4.4h2.9v2.9" /><path d="m11.7 8 3.5-3.5" /></svg>
+                                  </button>
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        match.teamB ?? 'TBD'
+                      )}
                     </div>
                   </div>
                 </article>
@@ -130,9 +200,53 @@ function matchStatus(match: Match): 'gespielt' | 'terminiert' | 'offen' | 'bye' 
                             <span>Match {String(match.nr).padStart(2, '0')}</span>
                             <span>{status === 'gespielt' ? result : status === 'bye' ? 'BYE' : match.termin ?? 'offen'}</span>
                           </div>
-                          <div class={`plan-team ${match.sieger === 'A' || status === 'bye' ? 'is-winner' : ''}`}>{match.teamA ?? 'TBD'}</div>
+                          <div class={`plan-team ${match.sieger === 'A' || status === 'bye' ? 'is-winner' : ''}`}>
+                            {(match.teamA && match.teamA !== 'BYE') ? (
+                              <div class="team-players">
+                                {getTeamPlayers(match.teamA).map((player) => (
+                                  <div class="team-player-row">
+                                    <span class="truncate">{player.name}</span>
+                                    {player.telefon && (
+                                      <span class="contact-actions">
+                                        <a class="contact-link contact-link-whatsapp" href={whatsappHref(player.telefon)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp an ${player.name} öffnen`} title={`WhatsApp an ${player.name} öffnen`}>
+                                          <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M5.2 15.1 3 17l.7-2.8A7 7 0 1 1 5.2 15.1Z" /><path d="M7.2 6.9c.2-.4.4-.5.7-.5h.5c.2 0 .4.1.5.4l.5 1.2c.1.3 0 .5-.2.7l-.4.4c.5.9 1.2 1.6 2.1 2.1l.4-.4c.2-.2.5-.3.7-.2l1.2.5c.3.1.4.3.4.6v.5c0 .3-.2.5-.5.7-.6.3-1.3.3-2.2 0-1.8-.6-3.7-2.5-4.3-4.3-.3-.8-.3-1.5 0-2.1Z" /></svg>
+                                        </a>
+                                        <button class="contact-link contact-link-number" type="button" data-phone-open data-phone-name={player.name} data-phone-number={player.telefon} aria-label={`Telefonnummer von ${player.name} anzeigen`} title={`Telefonnummer von ${player.name} anzeigen`}>
+                                          <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M7.1 4.1 8.3 6.7 7 8c.6 1.5 1.7 2.7 3.1 3.1l1.3-1.3 2.6 1.2-.2 2.2c0 .5-.4.9-.9.9-4.4-.1-8-3.7-8.1-8.1 0-.5.4-.9.9-.9l2.4-.1Z" /><path d="M12.4 4.4h2.9v2.9" /><path d="m11.7 8 3.5-3.5" /></svg>
+                                        </button>
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              match.teamA ?? 'TBD'
+                            )}
+                          </div>
                           <div class="plan-divider"></div>
-                          <div class={`plan-team ${match.sieger === 'B' ? 'is-winner' : ''}`}>{match.teamB ?? 'TBD'}</div>
+                          <div class={`plan-team ${match.sieger === 'B' ? 'is-winner' : ''}`}>
+                            {(match.teamB && match.teamB !== 'BYE') ? (
+                              <div class="team-players">
+                                {getTeamPlayers(match.teamB).map((player) => (
+                                  <div class="team-player-row">
+                                    <span class="truncate">{player.name}</span>
+                                    {player.telefon && (
+                                      <span class="contact-actions">
+                                        <a class="contact-link contact-link-whatsapp" href={whatsappHref(player.telefon)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp an ${player.name} öffnen`} title={`WhatsApp an ${player.name} öffnen`}>
+                                          <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M5.2 15.1 3 17l.7-2.8A7 7 0 1 1 5.2 15.1Z" /><path d="M7.2 6.9c.2-.4.4-.5.7-.5h.5c.2 0 .4.1.5.4l.5 1.2c.1.3 0 .5-.2.7l-.4.4c.5.9 1.2 1.6 2.1 2.1l.4-.4c.2-.2.5-.3.7-.2l1.2.5c.3.1.4.3.4.6v.5c0 .3-.2.5-.5.7-.6.3-1.3.3-2.2 0-1.8-.6-3.7-2.5-4.3-4.3-.3-.8-.3-1.5 0-2.1Z" /></svg>
+                                        </a>
+                                        <button class="contact-link contact-link-number" type="button" data-phone-open data-phone-name={player.name} data-phone-number={player.telefon} aria-label={`Telefonnummer von ${player.name} anzeigen`} title={`Telefonnummer von ${player.name} anzeigen`}>
+                                          <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M7.1 4.1 8.3 6.7 7 8c.6 1.5 1.7 2.7 3.1 3.1l1.3-1.3 2.6 1.2-.2 2.2c0 .5-.4.9-.9.9-4.4-.1-8-3.7-8.1-8.1 0-.5.4-.9.9-.9l2.4-.1Z" /><path d="M12.4 4.4h2.9v2.9" /><path d="m11.7 8 3.5-3.5" /></svg>
+                                        </button>
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              match.teamB ?? 'TBD'
+                            )}
+                          </div>
                         </article>
                       );
                     })}
@@ -237,6 +351,83 @@ function matchStatus(match: Match): 'gespielt' | 'terminiert' | 'offen' | 'bye' 
     line-height: 1.28rem;
   }
 
+  .team-players {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 0.38rem;
+  }
+
+  .team-player-row {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.55rem;
+  }
+
+  .contact-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-shrink: 0;
+  }
+
+  .contact-link {
+    display: inline-flex;
+    height: 1.7rem;
+    width: 1.7rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(26, 31, 46, 0.12);
+    background: rgba(255, 255, 255, 0.88);
+    color: var(--color-deep-ink);
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
+  }
+
+  .contact-link:hover {
+    transform: translateY(-1px);
+  }
+
+  .contact-link svg {
+    height: 0.9rem;
+    width: 0.9rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.7;
+  }
+
+  .contact-link-whatsapp {
+    color: #0f8e4c;
+  }
+
+  .contact-link-whatsapp:hover {
+    border-color: rgba(15, 142, 76, 0.28);
+    background: rgba(15, 142, 76, 0.08);
+  }
+
+  .contact-link-whatsapp svg {
+    fill: currentColor;
+    stroke: none;
+  }
+
+  .contact-link-number {
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .contact-link-number:hover {
+    border-color: rgba(26, 31, 46, 0.24);
+    background: rgba(26, 31, 46, 0.04);
+  }
+
+  .contact-link-number svg {
+    fill: none;
+    stroke: currentColor;
+  }
+
   .plan-team.is-winner {
     background: rgba(246, 241, 233, 0.98);
     font-weight: 600;
@@ -252,4 +443,129 @@ function matchStatus(match: Match): 'gespielt' | 'terminiert' | 'offen' | 'bye' 
     letter-spacing: 0.12em;
     text-transform: uppercase;
   }
+
+  .phone-dialog {
+    width: min(100%, 24rem);
+    max-width: calc(100vw - 1.5rem);
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+    transition: opacity 180ms ease, transform 180ms ease;
+  }
+
+  .phone-dialog.is-open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  .phone-dialog.is-closing {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  .phone-dialog::backdrop {
+    background: rgba(26, 31, 46, 0);
+    transition: background-color 180ms ease;
+  }
+
+  .phone-dialog.is-open::backdrop {
+    background: rgba(26, 31, 46, 0.45);
+  }
+
+  .phone-dialog.is-closing::backdrop {
+    background: rgba(26, 31, 46, 0);
+  }
+
+  .phone-dialog-panel {
+    padding: 1.1rem 1rem 1.15rem;
+  }
+
+  .phone-dialog-number {
+    font-family: var(--font-mono);
+    font-size: 1.05rem;
+    letter-spacing: 0.04em;
+    color: var(--color-deep-ink);
+    word-break: break-word;
+  }
+
+  .phone-dialog-close {
+    display: inline-flex;
+    height: 2.2rem;
+    width: 2.2rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(26, 31, 46, 0.12);
+    background: rgba(255, 255, 255, 0.78);
+    color: var(--color-deep-ink);
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .phone-dialog-close:hover {
+    background: rgba(26, 31, 46, 0.06);
+  }
 </style>
+
+<dialog class="phone-dialog rounded-sm border border-deep-ink/15 bg-warm-sand p-0 text-deep-ink shadow-[0_24px_70px_-36px_rgba(26,31,46,0.45)] backdrop:bg-deep-ink/45" data-phone-dialog>
+  <div class="border-b border-deep-ink/10 px-4 py-4">
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <div class="label-mono text-club-blue">Kontakt</div>
+        <h2 class="mt-1 font-serif text-2xl leading-tight" data-phone-dialog-name></h2>
+      </div>
+      <button type="button" class="phone-dialog-close" data-phone-close aria-label="Telefonnummer schliessen">
+        <span aria-hidden="true">×</span>
+      </button>
+    </div>
+  </div>
+  <div class="phone-dialog-panel">
+    <div class="phone-dialog-number" data-phone-dialog-number></div>
+  </div>
+</dialog>
+
+<script>
+  document.querySelectorAll('[data-phone-dialog]').forEach((dialogEl) => {
+    const dialog = dialogEl;
+    const section = dialog.closest('section, div');
+    const closeButton = section?.querySelector('[data-phone-close]');
+    const nameTarget = section?.querySelector('[data-phone-dialog-name]');
+    const numberTarget = section?.querySelector('[data-phone-dialog-number]');
+    if (!(dialog instanceof HTMLDialogElement) || !nameTarget || !numberTarget) return;
+
+    function openDialog() {
+      if (!dialog.open) {
+        dialog.showModal();
+        requestAnimationFrame(() => dialog.classList.add('is-open'));
+      }
+    }
+
+    function closeDialog() {
+      if (!dialog.open || dialog.classList.contains('is-closing')) return;
+      dialog.classList.remove('is-open');
+      dialog.classList.add('is-closing');
+      window.setTimeout(() => {
+        dialog.close();
+        dialog.classList.remove('is-closing');
+      }, 220);
+    }
+
+    section?.querySelectorAll('[data-phone-open]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const name = button.getAttribute('data-phone-name') ?? '';
+        const number = button.getAttribute('data-phone-number') ?? '';
+        nameTarget.textContent = name;
+        numberTarget.textContent = number;
+        openDialog();
+      });
+    });
+
+    closeButton?.addEventListener('click', closeDialog);
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) closeDialog();
+    });
+    dialog.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      closeDialog();
+    });
+  });
+</script>
