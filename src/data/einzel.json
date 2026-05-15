@@ -32,7 +32,7 @@
     { "nr": 5, "gruppe": 4, "monat": "Juli", "spielerA": "Moritz Schich", "spielerB": "Artur Brauer", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 6, "gruppe": 4, "monat": "Juli", "spielerA": "Moritz Schich", "spielerB": "Jakob Steinle", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
 
-    { "nr": 1, "gruppe": 5, "monat": "Mai", "spielerA": "Lucas Dollmann", "spielerB": "Edinson Espinoza", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
+    { "nr": 1, "gruppe": 5, "monat": "Mai", "spielerA": "Lucas Dollmann", "spielerB": "Edinson Espinoza", "termin": null, "satz1": "6:1", "satz2": "6:0", "mtb": null, "sieger": "A" },
     { "nr": 2, "gruppe": 5, "monat": "Mai", "spielerA": "Andreas Vogel", "spielerB": "Nick Kindermann", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 3, "gruppe": 5, "monat": "Mai", "spielerA": "Leonel Goncalves Mendes", "spielerB": "Edinson Espinoza", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 4, "gruppe": 5, "monat": "Juni", "spielerA": "Lucas Dollmann", "spielerB": "Andreas Vogel", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
