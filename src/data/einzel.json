@@ -61,7 +61,7 @@
     { "nr": 9, "gruppe": 7, "monat": "Juli", "spielerA": "Carsten Rose", "spielerB": "Maximilian Fischer", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 10, "gruppe": 7, "monat": "Juli", "spielerA": "Adel Thaaer", "spielerB": "Tim Strohm", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
 
-    { "nr": 1, "gruppe": 8, "monat": "Mai", "spielerA": "Louis Cieplik", "spielerB": "Manos Karampakakis", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
+    { "nr": 1, "gruppe": 8, "monat": "Mai", "spielerA": "Louis Cieplik", "spielerB": "Manos Karampakakis", "termin": null, "satz1": "6:4", "satz2": "6:3", "mtb": null, "sieger": "A" },
     { "nr": 2, "gruppe": 8, "monat": "Mai", "spielerA": "Jochen Eiden", "spielerB": "Nick Klenk", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 3, "gruppe": 8, "monat": "Juni", "spielerA": "Louis Cieplik", "spielerB": "Nick Klenk", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 4, "gruppe": 8, "monat": "Juni", "spielerA": "Jochen Eiden", "spielerB": "Manos Karampakakis", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
