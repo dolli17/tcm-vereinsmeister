@@ -1,6 +1,6 @@
 {
   "matches": [
-    { "nr": 1, "gruppe": 1, "monat": "Mai", "spielerA": "Patrick Strohm", "spielerB": "Nicolas Vogel", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
+    { "nr": 1, "gruppe": 1, "monat": "Mai", "spielerA": "Patrick Strohm", "spielerB": "Nicolas Vogel", "termin": null, "satz1": "6:2", "satz2": "6:2", "mtb": null, "sieger": "A" },
     { "nr": 2, "gruppe": 1, "monat": "Mai", "spielerA": "Ladislav Virag", "spielerB": "Gregor Skatulla", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 3, "gruppe": 1, "monat": "Juni", "spielerA": "Patrick Strohm", "spielerB": "Gregor Skatulla", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 4, "gruppe": 1, "monat": "Juni", "spielerA": "Ladislav Virag", "spielerB": "Nicolas Vogel", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
