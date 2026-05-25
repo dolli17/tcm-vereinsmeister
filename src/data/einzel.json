@@ -12,7 +12,7 @@
     { "nr": 3, "gruppe": 2, "monat": "Mai", "spielerA": "Wolfgang Putschky", "spielerB": "Patrick Wiemann", "termin": "Mo 01.06. 18:00", "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 4, "gruppe": 2, "monat": "Juni", "spielerA": "Frieder King", "spielerB": "Robin Heinzler", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 5, "gruppe": 2, "monat": "Juni", "spielerA": "Wolfgang Putschky", "spielerB": "Julian Völker", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
-    { "nr": 6, "gruppe": 2, "monat": "Juni", "spielerA": "Robin Heinzler", "spielerB": "Patrick Wiemann", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
+    { "nr": 6, "gruppe": 2, "monat": "Juni", "spielerA": "Robin Heinzler", "spielerB": "Patrick Wiemann", "termin": null, "satz1": "6:7", "satz2": "6:4", "mtb": "7:10", "sieger": "B" },
     { "nr": 7, "gruppe": 2, "monat": "Juni", "spielerA": "Frieder King", "spielerB": "Wolfgang Putschky", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 8, "gruppe": 2, "monat": "Juli", "spielerA": "Frieder King", "spielerB": "Julian Völker", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 9, "gruppe": 2, "monat": "Juli", "spielerA": "Robin Heinzler", "spielerB": "Wolfgang Putschky", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
