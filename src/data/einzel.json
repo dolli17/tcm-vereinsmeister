@@ -27,7 +27,7 @@
 
     { "nr": 1, "gruppe": 4, "monat": "Mai", "spielerA": "Max Böhme", "spielerB": "Artur Brauer", "termin": null, "satz1": "6:1", "satz2": "6:1", "mtb": null, "sieger": "A" },
     { "nr": 2, "gruppe": 4, "monat": "Juni", "spielerA": "Max Böhme", "spielerB": "Jakob Steinle", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
-    { "nr": 3, "gruppe": 4, "monat": "Juni", "spielerA": "Artur Brauer", "spielerB": "Jakob Steinle", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
+    { "nr": 3, "gruppe": 4, "monat": "Juni", "spielerA": "Artur Brauer", "spielerB": "Jakob Steinle", "termin": null, "satz1": "6:0", "satz2": "6:0", "mtb": null, "sieger": "A" },
     { "nr": 4, "gruppe": 4, "monat": "Juli", "spielerA": "Moritz Schich", "spielerB": "Max Böhme", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 5, "gruppe": 4, "monat": "Juli", "spielerA": "Moritz Schich", "spielerB": "Artur Brauer", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 6, "gruppe": 4, "monat": "Juli", "spielerA": "Moritz Schich", "spielerB": "Jakob Steinle", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
