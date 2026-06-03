@@ -9,7 +9,7 @@
 
     { "nr": 1, "gruppe": 2, "monat": "Mai", "spielerA": "Ana Sunjic", "spielerB": "Lisa Rühl", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 2, "gruppe": 2, "monat": "Mai", "spielerA": "Olena Golubenko", "spielerB": "Anna-Sophia Utermann", "termin": null, "satz1": "6:2", "satz2": "6:1", "mtb": null, "sieger": "A" },
-    { "nr": 3, "gruppe": 2, "monat": "Mai", "spielerA": "Manuela Wältl", "spielerB": "Lisa Rühl", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
+    { "nr": 3, "gruppe": 2, "monat": "Mai", "spielerA": "Manuela Wältl", "spielerB": "Lisa Rühl", "termin": null, "satz1": "0:6", "satz2": "0:6", "mtb": null, "sieger": "B" },
     { "nr": 4, "gruppe": 2, "monat": "Juni", "spielerA": "Ana Sunjic", "spielerB": "Olena Golubenko", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 5, "gruppe": 2, "monat": "Juni", "spielerA": "Manuela Wältl", "spielerB": "Anna-Sophia Utermann", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },
     { "nr": 6, "gruppe": 2, "monat": "Juni", "spielerA": "Olena Golubenko", "spielerB": "Lisa Rühl", "termin": null, "satz1": null, "satz2": null, "mtb": null, "sieger": null },

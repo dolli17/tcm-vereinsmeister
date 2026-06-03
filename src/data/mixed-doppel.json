@@ -81,10 +81,10 @@
           "teamA": "Julia Ilzhöfer / Wolfgang Putschky",
           "teamB": "Jenny Fischer / Georg Fischer",
           "termin": null,
-          "satz1": null,
-          "satz2": null,
+          "satz1": "6:0",
+          "satz2": "6:1",
           "mtb": null,
-          "sieger": null
+          "sieger": "A"
         }
       ]
     },
