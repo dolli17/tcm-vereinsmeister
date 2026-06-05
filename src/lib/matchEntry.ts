@@ -24,6 +24,7 @@ export type PlayerMatch = {
   meineSeite: 'A' | 'B';
   partner: string[];
   gegner: string[];
+  isBye: boolean;
   status: ResultStatus;
   result: string | null;
   sieger: 'A' | 'B' | null;
@@ -99,12 +100,13 @@ export function getPlayerMatches(playerName: string, userId: number): PlayerMatc
     const inA = f.sideA.includes(playerName);
     const inB = f.sideB.includes(playerName);
     if (!inA && !inB) continue;
-    // Freilose und noch unbestimmte KO-Slots überspringen.
-    if (f.sideA.length === 0 || f.sideB.length === 0) continue;
 
     const meineSeite: 'A' | 'B' = inA ? 'A' : 'B';
     const ownSide = inA ? f.sideA : f.sideB;
     const otherSide = inA ? f.sideB : f.sideA;
+    if (ownSide.length === 0) continue; // Datenanomalie: eigene Seite leer
+    // Freilos: Gegnerseite leer (BYE) → wird angezeigt, aber kein Ergebnis nötig.
+    const isBye = otherSide.length === 0;
     const res = resultMap.get(matchKey(f.wettbewerb, { gruppe: f.gruppe, runde: f.runde, nr: f.nr }));
     const status: ResultStatus = res ? res.status : 'open';
     const ichGewonnen = res && res.sieger ? res.sieger === meineSeite : null;
@@ -123,15 +125,16 @@ export function getPlayerMatches(playerName: string, userId: number): PlayerMatc
       sideB: f.sideB,
       meineSeite,
       partner: ownSide.filter((p) => p !== playerName),
-      gegner: otherSide,
+      gegner: isBye ? [] : otherSide,
+      isBye,
       status,
       result: res && (res.status === 'confirmed' || res.status === 'pending') ? formatResult(res) : null,
       sieger: res?.sieger ?? null,
       ichGewonnen,
       submittedByMe: res?.submitted_by === userId,
       rejectReason: res?.status === 'rejected' ? res.reject_reason : null,
-      // Abgelehnte Partien gehen NICHT zurück an die Spieler — sie werden vom Admin geklärt.
-      canEnter: status === 'open',
+      // Abgelehnte Partien gehen NICHT zurück an die Spieler; Freilose haben kein Ergebnis.
+      canEnter: status === 'open' && !isBye,
       canDecide,
       resultId: res?.id ?? null,
     });

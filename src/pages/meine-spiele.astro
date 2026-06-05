@@ -9,7 +9,7 @@ const approved = !!user.player_name && user.claim_status === 'approved';
 const matches: PlayerMatch[] = approved ? getPlayerMatches(user.player_name!, user.id) : [];
 
 // Zu bestätigende zuerst, dann offene, dann der Rest.
-const prio = (m: PlayerMatch) => (m.canDecide ? 0 : { rejected: 1, open: 2, pending: 3, confirmed: 4 }[m.status]);
+const prio = (m: PlayerMatch) => (m.canDecide ? 0 : m.isBye ? 5 : { rejected: 1, open: 2, pending: 3, confirmed: 4 }[m.status]);
 matches.sort((a, b) => prio(a) - prio(b) || a.wettbewerbLabel.localeCompare(b.wettbewerbLabel, 'de'));
 
 const params = Astro.url.searchParams;
@@ -100,13 +100,21 @@ const statusBadge: Record<PlayerMatch['status'], { text: string; cls: string }> 
                 <div class="label-mono text-club-blue">{m.wettbewerbLabel}</div>
                 <div class="mt-0.5 font-mono text-[11px] text-muted-2">{ctxLabel(m)} · Match {String(m.nr).padStart(2, '0')}</div>
               </div>
-              <span class={`status-badge ${statusBadge[m.status].cls}`}>{statusBadge[m.status].text}</span>
+              {m.isBye
+                ? <span class="status-badge badge-bye">Freilos</span>
+                : <span class={`status-badge ${statusBadge[m.status].cls}`}>{statusBadge[m.status].text}</span>}
             </div>
 
             <div class="mt-2 text-[15px] text-deep-ink">
-              {m.sideA.join(' / ')} <span class="text-muted-2">vs</span> {m.sideB.join(' / ')}
+              {m.sideA.length ? m.sideA.join(' / ') : 'Freilos'} <span class="text-muted-2">vs</span> {m.sideB.length ? m.sideB.join(' / ') : 'Freilos'}
             </div>
-            <div class="mt-0.5 text-sm text-muted">Gegner: {m.gegner.join(' / ')}{m.partner.length > 0 ? ` · Partner: ${m.partner.join(' / ')}` : ''}</div>
+            <div class="mt-0.5 text-sm text-muted">
+              {m.isBye ? 'Freilos' : `Gegner: ${m.gegner.join(' / ')}`}{m.partner.length > 0 ? ` · Partner: ${m.partner.join(' / ')}` : ''}
+            </div>
+
+            {m.isBye && (
+              <div class="mt-1 text-sm text-muted">Freilos — kein Ergebnis nötig, du bist ohne Spiel eine Runde weiter.</div>
+            )}
 
             {(m.status === 'confirmed' || m.status === 'pending') && m.result && (
               <div class="mt-2 font-mono text-[13px] text-deep-ink">
@@ -193,6 +201,7 @@ const statusBadge: Record<PlayerMatch['status'], { text: string; cls: string }> 
     .badge-pending { background: rgba(180,120,20,0.14); color: #8a5a10; }
     .badge-confirmed { background: rgba(31,122,77,0.14); color: #1f7a4d; }
     .badge-rejected { background: rgba(179,64,47,0.14); color: var(--color-court-red); }
+    .badge-bye { background: rgba(26,31,46,0.06); color: var(--color-muted-2); }
     .score-input {
       width: 100%; min-height: 42px; border: 1px solid rgba(26,31,46,0.18);
       border-radius: 6px; padding: 0.5rem 0.6rem; font: inherit; font-family: var(--font-mono);
