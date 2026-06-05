@@ -1,5 +1,5 @@
 ---
-import telefonnummern from '../data/telefonnummern.json';
+import { getPhoneMap } from '../lib/players';
 
 type Match = {
   nr: number;
@@ -38,7 +38,7 @@ const {
   konkurrenzLabel = headline,
 } = Astro.props;
 
-const phoneMap = telefonnummern as Record<string, string>;
+const phoneMap = getPhoneMap();
 const isEmpty = runden.length === 0 || runden.every((runde) => runde.matches.length === 0);
 
 // Bracket-Geometrie. Match-Höhe ist via .plan-team min-height fixiert,

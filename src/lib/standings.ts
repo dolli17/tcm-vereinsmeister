@@ -1,30 +1,10 @@
-import einzelData from '../data/einzel.json';
-import damenEinzelData from '../data/damen-einzel.json';
-import spielerData from '../data/spieler.json';
+import { EINZEL_SPIELER, DAMEN_EINZEL_SPIELER } from './fixtures';
+import { getEinzelMatches } from './results';
+import { getPhoneMap } from './players';
+import type { Monat, Sieger, Konkurrenz, Match, Spieler } from './fixtures';
 
-export type Monat = 'Mai' | 'Juni' | 'Juli';
-export type Sieger = 'A' | 'B' | null;
-export type Konkurrenz = 'herren' | 'damen';
-
-export type Match = {
-  nr: number;
-  gruppe: number;
-  monat: Monat;
-  spielerA: string;
-  spielerB: string;
-  termin: string | null;
-  satz1: string | null;
-  satz2: string | null;
-  mtb: string | null;
-  sieger: Sieger;
-};
-
-export type Spieler = {
-  name: string;
-  gruppe: number;
-  gesetzt: boolean;
-  telefon?: string;
-};
+// Typen weiterhin aus standings re-exportieren (Komponenten importieren von hier).
+export type { Monat, Sieger, Konkurrenz, Match, Spieler };
 
 export type StandingRow = {
   name: string;
@@ -41,16 +21,14 @@ export type StandingRow = {
   platz: number;
 };
 
-const DATA: Record<Konkurrenz, { matches: Match[]; spieler: Spieler[] }> = {
-  herren: {
-    matches: einzelData.matches as Match[],
-    spieler: spielerData.einzel as Spieler[],
-  },
-  damen: {
-    matches: damenEinzelData.matches as Match[],
-    spieler: spielerData.damenEinzel as Spieler[],
-  },
-};
+// Effektive Daten (Fixtures + bestätigte DB-Ergebnisse) je Konkurrenz.
+function matchesOf(konkurrenz: Konkurrenz): Match[] {
+  return getEinzelMatches(konkurrenz);
+}
+
+function spielerOf(konkurrenz: Konkurrenz): Spieler[] {
+  return konkurrenz === 'damen' ? DAMEN_EINZEL_SPIELER : EINZEL_SPIELER;
+}
 
 function parseSet(set: string | null): { a: number; b: number } | null {
   if (!set) return null;
@@ -131,14 +109,14 @@ function playerStats(match: Match, name: string): PlayerStat | null {
 }
 
 export function computeStandings(gruppe: number, konkurrenz: Konkurrenz = 'herren'): StandingRow[] {
-  const dataset = DATA[konkurrenz];
-  const spieler = dataset.spieler.filter((s) => s.gruppe === gruppe);
-  const matches = dataset.matches.filter((m) => m.gruppe === gruppe);
+  const spieler = spielerOf(konkurrenz).filter((s) => s.gruppe === gruppe);
+  const matches = matchesOf(konkurrenz).filter((m) => m.gruppe === gruppe);
+  const phones = getPhoneMap();
 
   const rows: StandingRow[] = spieler.map((s) => ({
     name: s.name,
     gesetzt: s.gesetzt,
-    telefon: s.telefon,
+    telefon: phones[s.name] ?? s.telefon,
     gespielt: 0,
     siege: 0,
     niederlagen: 0,
@@ -221,22 +199,22 @@ function h2hAggregate(name: string, matches: Match[]) {
 }
 
 export function getMatches(gruppe: number, monat?: Monat, konkurrenz: Konkurrenz = 'herren'): Match[] {
-  let m = DATA[konkurrenz].matches.filter((x) => x.gruppe === gruppe);
+  let m = matchesOf(konkurrenz).filter((x) => x.gruppe === gruppe);
   if (monat) m = m.filter((x) => x.monat === monat);
   return m.slice().sort((a, b) => a.nr - b.nr);
 }
 
 export function getAllMatches(monat?: Monat, konkurrenz: Konkurrenz = 'herren'): Match[] {
-  const all = DATA[konkurrenz].matches;
+  const all = matchesOf(konkurrenz);
   return monat ? all.filter((x) => x.monat === monat) : all.slice();
 }
 
 export function getGruppen(konkurrenz: Konkurrenz = 'herren'): number[] {
-  return Array.from(new Set(DATA[konkurrenz].spieler.map((s) => s.gruppe))).sort((a, b) => a - b);
+  return Array.from(new Set(spielerOf(konkurrenz).map((s) => s.gruppe))).sort((a, b) => a - b);
 }
 
 export function getSpielerOfGruppe(gruppe: number, konkurrenz: Konkurrenz = 'herren'): Spieler[] {
-  return DATA[konkurrenz].spieler.filter((s) => s.gruppe === gruppe);
+  return spielerOf(konkurrenz).filter((s) => s.gruppe === gruppe);
 }
 
 export function formatResult(m: Match): string {

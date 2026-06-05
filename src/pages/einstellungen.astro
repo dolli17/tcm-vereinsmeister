@@ -1,0 +1,96 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getPhone } from '../lib/players';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+
+const approved = !!user.player_name && user.claim_status === 'approved';
+const currentPhone = approved ? (getPhone(user.player_name!) ?? '') : '';
+
+const params = Astro.url.searchParams;
+const ok = params.get('ok');
+const okMsg = ok === 'phone' ? 'Telefonnummer gespeichert.' : ok === 'pw' ? 'Passwort geändert.' : null;
+const error = params.get('error');
+const errorMsg =
+  error === 'current' ? 'Das aktuelle Passwort ist falsch.' :
+  error === 'pwlen' ? 'Das neue Passwort muss mindestens 8 Zeichen haben.' :
+  error === 'pwmatch' ? 'Die neuen Passwörter stimmen nicht überein.' :
+  error === 'phone' ? 'Bitte eine gültige Telefonnummer eingeben.' :
+  error === 'notapproved' ? 'Dein Namensanspruch ist noch nicht freigegeben.' :
+  error ? 'Es ist ein Fehler aufgetreten.' : null;
+---
+
+<Layout title="Einstellungen · Vereinsmeisterschaft">
+  <div class="border-b border-deep-ink/10 bg-warm-sand-2/40">
+    <div class="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-2">
+      <a href="/meine-spiele" class="auth-nav-link">← Meine Spiele</a>
+      <form method="POST" action="/api/auth/logout"><button type="submit" class="auth-nav-link">Abmelden</button></form>
+    </div>
+  </div>
+
+  <main class="mx-auto max-w-2xl px-4 py-8">
+    <div class="label-mono text-club-blue">Mein Bereich</div>
+    <h1 class="mt-1 font-serif text-4xl leading-tight text-deep-ink">Einstellungen</h1>
+    <p class="mt-2 text-[15px] text-muted">Angemeldet als {user.email}{user.player_name ? ` · ${user.player_name}` : ''}</p>
+
+    {okMsg && <div class="mt-5 rounded-sm border border-club-blue/30 bg-club-blue/5 px-4 py-3 text-[15px] text-deep-ink">{okMsg}</div>}
+    {errorMsg && <div class="mt-5 rounded-sm border border-court-red/30 bg-court-red/5 px-4 py-3 text-[15px] text-deep-ink">{errorMsg}</div>}
+
+    <section class="mt-8">
+      <h2 class="font-serif text-2xl text-deep-ink">Telefonnummer</h2>
+      {approved ? (
+        <form method="POST" action="/api/settings/phone" class="mt-3 grid gap-3">
+          <p class="text-sm text-muted">Wird für die Kontaktaufnahme (WhatsApp/Anruf) auf der Turnierseite angezeigt.</p>
+          <label class="block">
+            <span class="label-mono mb-1.5 block text-muted-2">Telefonnummer</span>
+            <input class="set-input" type="tel" name="telefon" value={currentPhone} placeholder="z. B. 0151 23456789" autocomplete="tel" />
+          </label>
+          <div><button type="submit" class="set-button">Telefonnummer speichern</button></div>
+        </form>
+      ) : (
+        <p class="mt-2 text-muted">Sobald dein Namensanspruch freigegeben ist, kannst du hier deine Telefonnummer pflegen.</p>
+      )}
+    </section>
+
+    <section class="mt-10">
+      <h2 class="font-serif text-2xl text-deep-ink">Passwort ändern</h2>
+      <form method="POST" action="/api/settings/password" class="mt-3 grid gap-3">
+        <label class="block">
+          <span class="label-mono mb-1.5 block text-muted-2">Aktuelles Passwort</span>
+          <input class="set-input" type="password" name="current" required autocomplete="current-password" />
+        </label>
+        <label class="block">
+          <span class="label-mono mb-1.5 block text-muted-2">Neues Passwort (min. 8 Zeichen)</span>
+          <input class="set-input" type="password" name="password" required minlength="8" autocomplete="new-password" />
+        </label>
+        <label class="block">
+          <span class="label-mono mb-1.5 block text-muted-2">Neues Passwort wiederholen</span>
+          <input class="set-input" type="password" name="password2" required minlength="8" autocomplete="new-password" />
+        </label>
+        <div><button type="submit" class="set-button">Passwort ändern</button></div>
+      </form>
+    </section>
+  </main>
+
+  <style>
+    .auth-nav-link {
+      cursor: pointer; background: transparent; border: none;
+      font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+      letter-spacing: 1.1px; text-transform: uppercase; color: var(--color-muted);
+    }
+    .auth-nav-link:hover { color: var(--color-deep-ink); }
+    .set-input {
+      width: 100%; min-height: 48px; border: 1px solid rgba(26, 31, 46, 0.18);
+      border-radius: 6px; padding: 0.75rem 0.9rem; color: var(--color-deep-ink);
+      background: rgba(255, 255, 255, 0.7); font: inherit; outline: none;
+    }
+    .set-input:focus { border-color: var(--color-deep-ink); }
+    .set-button {
+      cursor: pointer; min-height: 46px; border-radius: 6px; padding: 0 1.1rem;
+      border: 1px solid var(--color-deep-ink); background: var(--color-deep-ink); color: #fff;
+      font-family: var(--font-mono); font-size: 12px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase;
+    }
+    .set-button:active { transform: translateY(1px); }
+  </style>
+</Layout>

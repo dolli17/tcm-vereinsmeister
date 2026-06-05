@@ -1,0 +1,218 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getPlayerMatches, type PlayerMatch } from '../lib/matchEntry';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+
+const approved = !!user.player_name && user.claim_status === 'approved';
+const matches: PlayerMatch[] = approved ? getPlayerMatches(user.player_name!, user.id) : [];
+
+// Zu bestätigende zuerst, dann offene, dann der Rest.
+const prio = (m: PlayerMatch) => (m.canDecide ? 0 : { rejected: 1, open: 2, pending: 3, confirmed: 4 }[m.status]);
+matches.sort((a, b) => prio(a) - prio(b) || a.wettbewerbLabel.localeCompare(b.wettbewerbLabel, 'de'));
+
+const params = Astro.url.searchParams;
+const entered = params.get('entered') === '1';
+const decided = params.get('decided');
+const decidedMsg = decided === 'accepted' ? 'Ergebnis bestätigt — es zählt jetzt für die Tabelle.' : decided === 'rejected' ? 'Ergebnis abgelehnt. Der Sportwart wurde informiert.' : null;
+const error = params.get('error');
+const errorMsg =
+  error === 'score' ? 'Das Ergebnis konnte nicht gelesen werden. Bitte Sätze prüfen (z. B. 6:3).' :
+  error === 'exists' ? 'Für dieses Spiel liegt bereits ein Ergebnis vor.' :
+  error === 'inreview' ? 'Diese Partie wird gerade vom Admin geklärt und kann nicht erneut eingetragen werden.' :
+  error === 'notyours' ? 'Dieses Spiel gehört nicht zu dir.' :
+  error === 'notapproved' ? 'Dein Namensanspruch ist noch nicht freigegeben.' :
+  error === 'ownresult' ? 'Dein eigenes Ergebnis kann nur der Gegner bestätigen.' :
+  error === 'gone' ? 'Dieses Ergebnis wurde bereits bearbeitet.' :
+  error === 'conflict' ? 'Für dieses Spiel liegt bereits ein bestätigtes Ergebnis vor.' :
+  error === 'fixture' ? 'Spiel nicht gefunden.' :
+  error ? 'Es ist ein Fehler aufgetreten.' : null;
+
+const ctxLabel = (m: PlayerMatch) => m.runde ?? (m.gruppe != null ? `Gruppe ${m.gruppe}` : '');
+const statusBadge: Record<PlayerMatch['status'], { text: string; cls: string }> = {
+  open: { text: 'offen', cls: 'badge-open' },
+  pending: { text: 'wartet auf Bestätigung', cls: 'badge-pending' },
+  confirmed: { text: 'bestätigt', cls: 'badge-confirmed' },
+  rejected: { text: 'in Klärung beim Admin', cls: 'badge-rejected' },
+};
+---
+
+<Layout title="Meine Spiele · Vereinsmeisterschaft">
+  <div class="border-b border-deep-ink/10 bg-warm-sand-2/40">
+    <div class="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-2">
+      <a href="/" class="auth-nav-link">← Übersicht</a>
+      <div class="flex items-center gap-4">
+        <a href="/einstellungen" class="auth-nav-link">Einstellungen</a>
+        <form method="POST" action="/api/auth/logout"><button type="submit" class="auth-nav-link">Abmelden</button></form>
+      </div>
+    </div>
+  </div>
+
+  <main class="mx-auto max-w-3xl px-4 py-8">
+    <div class="label-mono text-club-blue">Mein Bereich</div>
+    <h1 class="mt-1 font-serif text-4xl leading-tight text-deep-ink">Meine Spiele</h1>
+    <p class="mt-2 text-[15px] text-muted">
+      Angemeldet als {user.email}{user.player_name ? ` · ${user.player_name}` : ''}
+    </p>
+
+    {entered && (
+      <div class="mt-5 rounded-sm border border-club-blue/30 bg-club-blue/5 px-4 py-3 text-[15px] text-deep-ink">
+        Ergebnis eingetragen! Dein Gegner wurde per E-Mail informiert und bestätigt es hier in der App.
+      </div>
+    )}
+    {decidedMsg && (
+      <div class="mt-5 rounded-sm border border-club-blue/30 bg-club-blue/5 px-4 py-3 text-[15px] text-deep-ink">{decidedMsg}</div>
+    )}
+    {errorMsg && (
+      <div class="mt-5 rounded-sm border border-court-red/30 bg-court-red/5 px-4 py-3 text-[15px] text-deep-ink">
+        {errorMsg}
+      </div>
+    )}
+
+    {!user.player_name && (
+      <div class="mt-5 rounded-sm border border-court-red/30 bg-court-red/5 px-4 py-3 text-[15px] text-deep-ink">
+        Du hast noch keinen Namen beansprucht. Bitte <a class="text-club-blue underline" href="/registrieren">wähle deinen Namen</a>.
+      </div>
+    )}
+    {user.player_name && user.claim_status === 'pending' && (
+      <div class="mt-5 rounded-sm border border-court-red/30 bg-court-red/5 px-4 py-3 text-[15px] text-deep-ink">
+        Dein Namensanspruch <strong>{user.player_name}</strong> wartet auf die Freigabe durch den Admin.
+        Sobald er freigegeben ist, kannst du Ergebnisse eintragen.
+      </div>
+    )}
+    {user.player_name && user.claim_status === 'rejected' && (
+      <div class="mt-5 rounded-sm border border-court-red/30 bg-court-red/5 px-4 py-3 text-[15px] text-deep-ink">
+        Dein Namensanspruch wurde abgelehnt. Bitte kontaktiere den Sportwart.
+      </div>
+    )}
+
+    {approved && matches.length === 0 && (
+      <p class="mt-8 text-muted">Für dich sind aktuell keine Spiele hinterlegt.</p>
+    )}
+
+    {approved && (
+      <div class="mt-6 grid gap-3">
+        {matches.map((m) => (
+          <article class="rounded-sm border border-deep-ink/12 bg-white/55 p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <div class="label-mono text-club-blue">{m.wettbewerbLabel}</div>
+                <div class="mt-0.5 font-mono text-[11px] text-muted-2">{ctxLabel(m)} · Match {String(m.nr).padStart(2, '0')}</div>
+              </div>
+              <span class={`status-badge ${statusBadge[m.status].cls}`}>{statusBadge[m.status].text}</span>
+            </div>
+
+            <div class="mt-2 text-[15px] text-deep-ink">
+              {m.sideA.join(' / ')} <span class="text-muted-2">vs</span> {m.sideB.join(' / ')}
+            </div>
+            <div class="mt-0.5 text-sm text-muted">Gegner: {m.gegner.join(' / ')}{m.partner.length > 0 ? ` · Partner: ${m.partner.join(' / ')}` : ''}</div>
+
+            {(m.status === 'confirmed' || m.status === 'pending') && m.result && (
+              <div class="mt-2 font-mono text-[13px] text-deep-ink">
+                {m.result}
+                {m.ichGewonnen != null && (
+                  <span class={m.ichGewonnen ? 'text-[#1f7a4d]' : 'text-court-red'}> · {m.ichGewonnen ? 'gewonnen' : 'verloren'}</span>
+                )}
+              </div>
+            )}
+            {m.status === 'pending' && m.submittedByMe && (
+              <div class="mt-1 text-sm text-muted">Du hast dieses Ergebnis eingetragen — warte auf Bestätigung des Gegners.</div>
+            )}
+            {m.status === 'pending' && m.canDecide && (
+              <div class="mt-3 rounded-sm border border-deep-ink/10 bg-warm-sand-2/40 p-3">
+                <div class="text-sm text-deep-ink">Stimmt dieses Ergebnis? Bitte bestätige oder lehne ab.</div>
+                <div class="mt-2 flex flex-wrap items-end gap-2">
+                  <form method="POST" action="/api/results/decide">
+                    <input type="hidden" name="result_id" value={m.resultId} />
+                    <input type="hidden" name="action" value="accept" />
+                    <button type="submit" class="decide-btn accept">Annehmen</button>
+                  </form>
+                  <form method="POST" action="/api/results/decide" class="flex items-end gap-2">
+                    <input type="hidden" name="result_id" value={m.resultId} />
+                    <input type="hidden" name="action" value="reject" />
+                    <label class="block">
+                      <span class="label-mono mb-1 block text-muted-2">Grund (optional)</span>
+                      <input class="score-input !text-left" name="reason" placeholder="z. B. Satz 2 war 6:3" />
+                    </label>
+                    <button type="submit" class="decide-btn reject">Ablehnen</button>
+                  </form>
+                </div>
+              </div>
+            )}
+            {m.status === 'pending' && !m.submittedByMe && !m.canDecide && (
+              <div class="mt-1 text-sm text-muted">Wird vom Gegner geprüft.</div>
+            )}
+            {m.status === 'rejected' && (
+              <div class="mt-1 text-sm text-court-red">
+                Das eingetragene Ergebnis wurde abgelehnt{m.rejectReason ? `: ${m.rejectReason}` : ''}.
+                Die Partie wird jetzt vom Sportwart/Admin geklärt — ihr müsst nichts weiter tun.
+              </div>
+            )}
+
+            {m.canEnter && (
+              <form method="POST" action="/api/results" class="mt-3 grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
+                <input type="hidden" name="wettbewerb" value={m.wettbewerb} />
+                {m.gruppe != null && <input type="hidden" name="gruppe" value={m.gruppe} />}
+                {m.runde && <input type="hidden" name="runde" value={m.runde} />}
+                <input type="hidden" name="match_nr" value={m.nr} />
+                <label class="block">
+                  <span class="label-mono mb-1 block text-muted-2">Satz 1</span>
+                  <input class="score-input" name="satz1" required placeholder="6:3" inputmode="numeric" />
+                </label>
+                <label class="block">
+                  <span class="label-mono mb-1 block text-muted-2">Satz 2</span>
+                  <input class="score-input" name="satz2" required placeholder="6:4" inputmode="numeric" />
+                </label>
+                <label class="block">
+                  <span class="label-mono mb-1 block text-muted-2">MTB</span>
+                  <input class="score-input" name="mtb" placeholder="10:7" inputmode="numeric" />
+                </label>
+                <button type="submit" class="enter-button">Eintragen</button>
+              </form>
+            )}
+          </article>
+        ))}
+      </div>
+    )}
+  </main>
+
+  <style>
+    .auth-nav-link {
+      cursor: pointer; background: transparent; border: none;
+      font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+      letter-spacing: 1.1px; text-transform: uppercase; color: var(--color-muted);
+    }
+    .auth-nav-link:hover { color: var(--color-deep-ink); }
+    .status-badge {
+      flex: 0 0 auto; border-radius: 999px; padding: 0.2rem 0.6rem;
+      font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+      letter-spacing: 0.6px; text-transform: uppercase; white-space: nowrap;
+    }
+    .badge-open { background: rgba(26,31,46,0.08); color: var(--color-muted); }
+    .badge-pending { background: rgba(180,120,20,0.14); color: #8a5a10; }
+    .badge-confirmed { background: rgba(31,122,77,0.14); color: #1f7a4d; }
+    .badge-rejected { background: rgba(179,64,47,0.14); color: var(--color-court-red); }
+    .score-input {
+      width: 100%; min-height: 42px; border: 1px solid rgba(26,31,46,0.18);
+      border-radius: 6px; padding: 0.5rem 0.6rem; font: inherit; font-family: var(--font-mono);
+      background: rgba(255,255,255,0.8); outline: none; text-align: center;
+    }
+    .score-input:focus { border-color: var(--color-deep-ink); }
+    .enter-button {
+      cursor: pointer; min-height: 42px; border-radius: 6px;
+      border: 1px solid var(--color-deep-ink); background: var(--color-deep-ink); color: #fff;
+      padding: 0 0.9rem; font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+      letter-spacing: 1px; text-transform: uppercase;
+    }
+    .enter-button:active { transform: translateY(1px); }
+    .decide-btn {
+      cursor: pointer; min-height: 42px; border-radius: 6px; padding: 0 0.9rem; color: #fff;
+      border: 1px solid transparent; font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+      letter-spacing: 1px; text-transform: uppercase;
+    }
+    .decide-btn.accept { background: #1f7a4d; border-color: #1f7a4d; }
+    .decide-btn.reject { background: #b3402f; border-color: #b3402f; }
+    .decide-btn:active { transform: translateY(1px); }
+  </style>
+</Layout>

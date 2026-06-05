@@ -1,8 +1,8 @@
 ---
-import doppelData from '../data/doppel.json';
+import { getDoppelMatches } from '../lib/results';
 import KOView from './KOView.astro';
 
-const matches = (doppelData.matches ?? []).map((match) => ({
+const matches = getDoppelMatches('doppel').map((match) => ({
   nr: match.nr,
   teamA: match.doppelA,
   teamB: match.doppelB,

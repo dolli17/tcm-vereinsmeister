@@ -3,6 +3,11 @@ dist/
 # generated types
 .astro/
 
+# lokale SQLite-Datenbank
+data/
+*.sqlite
+*.sqlite-*
+
 # dependencies
 node_modules/
 

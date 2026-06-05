@@ -1,6 +1,10 @@
 ---
 import mixedData from '../data/mixed-doppel.json';
+import { getMixedRunden } from '../lib/results';
 import KOView from './KOView.astro';
+
+// Metadaten (Überschrift/Hinweis) statisch aus JSON, Runden mit DB-Ergebnissen.
+const runden = getMixedRunden();
 ---
 
 <KOView
@@ -8,5 +12,5 @@ import KOView from './KOView.astro';
   konkurrenzLabel={mixedData.headline}
   aktuelleRunde={mixedData.aktuelleRunde}
   hinweis={mixedData.hinweis}
-  runden={mixedData.runden}
+  runden={runden}
 />

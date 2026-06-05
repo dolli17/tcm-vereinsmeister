@@ -1,8 +1,6 @@
 ---
 import { getAllMatches, isMatchPlayed } from '../lib/standings';
-import doppelData from '../data/doppel.json';
-import damenDoppelData from '../data/damen-doppel.json';
-import mixedDoppelData from '../data/mixed-doppel.json';
+import { getDoppelMatches, getMixedMatches } from '../lib/results';
 
 // Soll-Gesamtanzahl pro Konkurrenz (Gruppe + komplette KO-Phase ohne Spiel
 // um Platz 3). Wer hier dreht, weil eine Konkurrenz wegfällt oder anders
@@ -20,15 +18,32 @@ const isMatchEntryPlayed = (m: { sieger: 'A' | 'B' | null }) => m.sieger === 'A'
 
 const herrenEinzelPlayed = getAllMatches(undefined, 'herren').filter(isMatchPlayed).length;
 const damenEinzelPlayed = getAllMatches(undefined, 'damen').filter(isMatchPlayed).length;
-const herrenDoppelPlayed = doppelData.matches.filter(isMatchEntryPlayed).length;
-const damenDoppelPlayed = damenDoppelData.matches.filter(isMatchEntryPlayed).length;
-const mixedDoppelPlayed = mixedDoppelData.runden
-  .flatMap((r) => r.matches)
-  .filter(isMatchEntryPlayed).length;
+const herrenDoppelPlayed = getDoppelMatches('doppel').filter(isMatchEntryPlayed).length;
+const damenDoppelPlayed = getDoppelMatches('damen-doppel').filter(isMatchEntryPlayed).length;
+const mixedDoppelPlayed = getMixedMatches().filter(isMatchEntryPlayed).length;
 
 const gespielt =
   herrenEinzelPlayed + damenEinzelPlayed + herrenDoppelPlayed + damenDoppelPlayed + mixedDoppelPlayed;
+
+const user = Astro.locals.user;
 ---
+
+<div class="border-b border-deep-ink/10 bg-warm-sand-2/40">
+  <div class="mx-auto flex max-w-5xl items-center justify-end gap-3 px-4 py-2 sm:px-8">
+    {user ? (
+      <>
+        <a href="/meine-spiele" class="auth-nav-link">Meine Spiele</a>
+        <a href="/einstellungen" class="auth-nav-link">Einstellungen</a>
+        {user.role === 'admin' && <a href="/admin" class="auth-nav-link">Admin</a>}
+        <form method="POST" action="/api/auth/logout" class="contents">
+          <button type="submit" class="auth-nav-link">Abmelden</button>
+        </form>
+      </>
+    ) : (
+      <a href="/login" class="auth-nav-link">Anmelden</a>
+    )}
+  </div>
+</div>
 
 <header class="border-b border-deep-ink/10 bg-warm-sand">
   <div class="mx-auto max-w-5xl px-4 pt-7 pb-6 sm:px-8 sm:pt-14 sm:pb-9">
@@ -57,3 +72,19 @@ const gespielt =
     </div>
   </div>
 </header>
+
+<style>
+  .auth-nav-link {
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 1.1px;
+    text-transform: uppercase;
+    color: var(--color-muted);
+    transition: color 0.16s ease;
+  }
+  .auth-nav-link:hover { color: var(--color-deep-ink); }
+</style>

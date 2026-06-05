@@ -1,0 +1,18 @@
+services:
+  app:
+    build: .
+    # Testphase: Zugriff über http://<VPS-IP>:<APP_PORT> (Standard 8080).
+    ports:
+      - "${APP_PORT:-8080}:4321"
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4321
+      DATABASE_PATH: /data/vm.sqlite
+    volumes:
+      - vm-data:/data
+    restart: unless-stopped
+
+volumes:
+  vm-data:

@@ -1,36 +1,7 @@
 ---
-import einzelData from '../data/einzel.json';
-import damenEinzelData from '../data/damen-einzel.json';
-import doppelData from '../data/doppel.json';
-import damenDoppelData from '../data/damen-doppel.json';
-import mixedDoppelData from '../data/mixed-doppel.json';
-import spielerData from '../data/spieler.json';
+import { EINZEL_SPIELER, DAMEN_EINZEL_SPIELER } from '../lib/fixtures';
+import { getEinzelMatches, getDoppelMatches, getMixedMatches } from '../lib/results';
 import { slugifyPlayer } from '../lib/playerStats';
-
-type EinzelMatch = {
-  nr: number;
-  gruppe: number;
-  monat: string;
-  spielerA: string;
-  spielerB: string;
-  termin: string | null;
-  satz1: string | null;
-  satz2: string | null;
-  mtb: string | null;
-  sieger: 'A' | 'B' | null;
-};
-
-type DoppelMatch = {
-  runde: string;
-  nr: number;
-  doppelA: string | null;
-  doppelB: string | null;
-  termin: string | null;
-  satz1: string | null;
-  satz2: string | null;
-  mtb: string | null;
-  sieger: 'A' | 'B' | null;
-};
 
 type MixedMatch = {
   runde: string;
@@ -44,31 +15,19 @@ type MixedMatch = {
   sieger: 'A' | 'B' | null;
 };
 
+// Effektive Match-Daten (Fixtures + bestätigte DB-Ergebnisse).
 const einzelMatches = [
-  ...(einzelData.matches as EinzelMatch[]).map((m) => ({ ...m, art: 'Einzel' as const })),
-  ...(damenEinzelData.matches as EinzelMatch[]).map((m) => ({ ...m, art: 'Damen Einzel' as const })),
+  ...getEinzelMatches('herren').map((m) => ({ ...m, art: 'Einzel' as const })),
+  ...getEinzelMatches('damen').map((m) => ({ ...m, art: 'Damen Einzel' as const })),
 ];
 // Herren- und Damen-Doppel teilen die Felder (doppelA/doppelB); für die Such-
 // Card unterscheiden wir nur über das art-Label.
 const doppelMatches = [
-  ...(doppelData.matches as DoppelMatch[]).map((m) => ({ ...m, art: 'Doppel' as const })),
-  ...(damenDoppelData.matches as DoppelMatch[]).map((m) => ({ ...m, art: 'Damen Doppel' as const })),
+  ...getDoppelMatches('doppel').map((m) => ({ ...m, art: 'Doppel' as const })),
+  ...getDoppelMatches('damen-doppel').map((m) => ({ ...m, art: 'Damen Doppel' as const })),
 ];
-// Mixed-Doppel ist als KO-Baum strukturiert (runden[].matches[]); für die Suche
-// flachen wir auf eine Match-Liste runter und merken uns den Rundennamen am Match.
-const mixedMatches: MixedMatch[] = mixedDoppelData.runden.flatMap((runde) =>
-  runde.matches.map((m) => ({
-    runde: runde.name,
-    nr: m.nr,
-    teamA: m.teamA ?? null,
-    teamB: m.teamB ?? null,
-    termin: m.termin ?? null,
-    satz1: m.satz1 ?? null,
-    satz2: m.satz2 ?? null,
-    mtb: m.mtb ?? null,
-    sieger: (m.sieger ?? null) as 'A' | 'B' | null,
-  })),
-);
+// Mixed-Doppel: flache Match-Liste inkl. Rundenname (mit DB-Ergebnissen).
+const mixedMatches: MixedMatch[] = getMixedMatches();
 
 function teamPlayers(team: string | null): string[] {
   if (!team || team === 'BYE') return [];
@@ -79,8 +38,8 @@ function teamPlayers(team: string | null): string[] {
 // keine echten Spielernamen — bei der Spielersuche ausblenden.
 const isPlaceholder = (name: string) => /^Sieger\s/i.test(name);
 
-const einzelSpieler = (spielerData.einzel as { name: string }[]).map((s) => s.name);
-const damenEinzelSpieler = (spielerData.damenEinzel as { name: string }[]).map((s) => s.name);
+const einzelSpieler = EINZEL_SPIELER.map((s) => s.name);
+const damenEinzelSpieler = DAMEN_EINZEL_SPIELER.map((s) => s.name);
 const doppelSpieler = doppelMatches.flatMap((m) => [...teamPlayers(m.doppelA), ...teamPlayers(m.doppelB)]);
 const mixedSpieler = mixedMatches.flatMap((m) => [...teamPlayers(m.teamA), ...teamPlayers(m.teamB)]);
 const spielerNamen = Array.from(

@@ -1,22 +1,14 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import {
-  getAllPlayerNames,
   getDoppelTeam,
   getMixedTeam,
   getPlayerBySlug,
   getPlayerStats,
-  slugifyPlayer,
 } from '../../lib/playerStats';
 
-export function getStaticPaths() {
-  return getAllPlayerNames().map((name) => ({
-    params: { slug: slugifyPlayer(name) },
-    props: { name },
-  }));
-}
-
-const name = Astro.props.name ?? getPlayerBySlug(Astro.params.slug ?? '');
+// SSR: pro Request gerendert, damit bestätigte Ergebnisse sofort erscheinen.
+const name = getPlayerBySlug(Astro.params.slug ?? '');
 if (!name) return Astro.redirect('/');
 
 const stats = getPlayerStats(name);
