@@ -16,7 +16,8 @@ export const POST: APIRoute = async ({ request, redirect, cookies }) => {
   if (password !== password2) return redirect('/registrieren?error=pwmatch');
   if (!playerName) return redirect('/registrieren?error=name');
 
-  const known = getDb().prepare('SELECT 1 FROM players WHERE name = ?').get(playerName);
+  const db = getDb();
+  const known = db.prepare('SELECT 1 FROM players WHERE name = ?').get(playerName);
   if (!known) return redirect('/registrieren?error=name');
 
   // Bereits registriert (mit Passwort)? Dann zum Login.
@@ -24,6 +25,12 @@ export const POST: APIRoute = async ({ request, redirect, cookies }) => {
   if (existing && getPasswordHash(existing.id)) {
     return redirect('/login?error=exists');
   }
+
+  // Name darf nicht schon von einem ANDEREN Account beansprucht sein (offen/bestätigt).
+  const taken = db
+    .prepare("SELECT 1 FROM users WHERE player_name = ? AND claim_status IN ('approved','pending') AND email != ?")
+    .get(playerName, email);
+  if (taken) return redirect('/registrieren?error=nametaken');
 
   const user = upsertUser(email, playerName);
   setPassword(user.id, password);
