@@ -49,6 +49,22 @@ function initSchema(db: Database.Database): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS reset_tokens (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      used_at    TEXT
+    );
+
+    -- Verhindert doppelte Erinnerungs-Mails pro Spiel & Monat.
+    CREATE TABLE IF NOT EXISTS reminders_sent (
+      match_key TEXT NOT NULL,
+      monat     TEXT NOT NULL,
+      sent_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (match_key, monat)
+    );
+
     CREATE TABLE IF NOT EXISTS results (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       wettbewerb   TEXT NOT NULL,   -- 'herren'|'damen'|'doppel'|'damen-doppel'|'mixed'

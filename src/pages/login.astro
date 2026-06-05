@@ -5,6 +5,7 @@ if (Astro.locals.user) return Astro.redirect('/meine-spiele');
 
 const params = Astro.url.searchParams;
 const error = params.get('error');
+const resetDone = params.get('reset') === '1';
 const errorMsg =
   error === 'creds' ? 'E-Mail oder Passwort ist falsch.' :
   error === 'exists' ? 'Für diese E-Mail gibt es bereits einen Account. Bitte hier anmelden.' :
@@ -17,6 +18,9 @@ const errorMsg =
     <h1 class="mt-5 font-serif text-4xl leading-tight text-deep-ink">Anmelden</h1>
     <p class="mt-2 text-[15px] leading-relaxed text-muted">Melde dich mit E-Mail und Passwort an.</p>
 
+    {resetDone && (
+      <div class="mt-6 rounded-sm border border-club-blue/30 bg-club-blue/5 px-4 py-3 text-[15px] text-deep-ink">Passwort geändert. Du kannst dich jetzt anmelden.</div>
+    )}
     {errorMsg && (
       <div class="mt-6 rounded-sm border border-court-red/30 bg-court-red/5 px-4 py-3 text-[15px] text-deep-ink">{errorMsg}</div>
     )}
@@ -33,7 +37,10 @@ const errorMsg =
       <button type="submit" class="auth-button">Anmelden</button>
     </form>
 
-    <p class="mt-6 text-sm text-muted">
+    <p class="mt-4 text-sm text-muted">
+      <a href="/passwort-vergessen" class="text-club-blue underline">Passwort vergessen?</a>
+    </p>
+    <p class="mt-2 text-sm text-muted">
       Noch kein Account? <a href="/registrieren" class="text-club-blue underline">Hier registrieren</a>
     </p>
   </main>

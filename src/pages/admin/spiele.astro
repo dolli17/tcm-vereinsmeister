@@ -1,0 +1,98 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getAllFixturesWithStatus, type AdminFixture } from '../../lib/matchEntry';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+if (user.role !== 'admin') return Astro.redirect('/');
+
+const fixtures = getAllFixturesWithStatus();
+
+// Nach Konkurrenz + (Gruppe/Runde) gruppieren, Reihenfolge wie in den Fixtures.
+const sections: { key: string; items: AdminFixture[] }[] = [];
+for (const f of fixtures) {
+  const sub = f.gruppe != null ? `Gruppe ${f.gruppe}` : (f.runde ?? '');
+  const key = `${f.wettbewerbLabel}${sub ? ' · ' + sub : ''}`;
+  let s = sections.find((x) => x.key === key);
+  if (!s) { s = { key, items: [] }; sections.push(s); }
+  s.items.push(f);
+}
+for (const s of sections) s.items.sort((a, b) => a.nr - b.nr);
+
+const params = Astro.url.searchParams;
+const ok = params.get('ok');
+const okMsg = ok === 'saved' ? 'Ergebnis gespeichert.' : ok === 'deleted' ? 'Ergebnis gelöscht.' : null;
+const err = params.get('error');
+const errMsg = err === 'score' ? 'Ungültiges Ergebnis (z. B. 6:3 / 6:4, bei 1:1 ein Match-Tiebreak).' : err === 'fixture' ? 'Spiel nicht gefunden.' : err ? 'Aktion fehlgeschlagen.' : null;
+
+const statusText: Record<AdminFixture['status'], string> = { open: 'offen', pending: 'wartet', confirmed: 'bestätigt', rejected: 'abgelehnt' };
+---
+
+<Layout title="Spiele verwalten · Admin">
+  <div class="border-b border-deep-ink/10 bg-warm-sand-2/40">
+    <div class="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-2">
+      <a href="/admin" class="auth-nav-link">← Admin</a>
+      <form method="POST" action="/api/auth/logout"><button type="submit" class="auth-nav-link">Abmelden</button></form>
+    </div>
+  </div>
+
+  <main class="mx-auto max-w-4xl px-4 py-8">
+    <div class="label-mono text-club-blue">Admin</div>
+    <h1 class="mt-1 font-serif text-4xl leading-tight text-deep-ink">Spiele verwalten</h1>
+    <p class="mt-2 text-[15px] text-muted">Ergebnis für jedes Spiel direkt eintragen, korrigieren oder löschen. Admin-Einträge gelten sofort als bestätigt.</p>
+
+    {okMsg && <div class="mt-5 rounded-sm border border-club-blue/30 bg-club-blue/5 px-4 py-3 text-[15px] text-deep-ink">{okMsg}</div>}
+    {errMsg && <div class="mt-5 rounded-sm border border-court-red/30 bg-court-red/5 px-4 py-3 text-[15px] text-deep-ink">{errMsg}</div>}
+
+    <div class="mt-6 space-y-7">
+      {sections.map((sec) => (
+        <section>
+          <h2 class="label-mono mb-2 text-court-red">{sec.key}</h2>
+          <div class="grid gap-1.5">
+            {sec.items.map((m) => (
+              <form method="POST" action="/api/admin/enter" class="grid grid-cols-1 items-center gap-2 rounded-sm border border-deep-ink/12 bg-white/55 p-2.5 sm:grid-cols-[1fr_auto]">
+                <input type="hidden" name="wettbewerb" value={m.wettbewerb} />
+                {m.gruppe != null && <input type="hidden" name="gruppe" value={m.gruppe} />}
+                {m.runde && <input type="hidden" name="runde" value={m.runde} />}
+                <input type="hidden" name="match_nr" value={m.nr} />
+                <div class="min-w-0">
+                  <div class="truncate text-[15px] text-deep-ink">
+                    <span class="font-mono text-[11px] text-muted-2">{String(m.nr).padStart(2, '0')}</span>
+                    {' '}{m.sideA.join(' / ')} <span class="text-muted-2">vs</span> {m.sideB.join(' / ')}
+                  </div>
+                  <div class="mt-0.5 text-[12px] text-muted-2">
+                    Status: {statusText[m.status]}{m.result ? ` · ${m.result}` : ''}
+                  </div>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <input class="adm-score" name="satz1" value={m.satz1 ?? ''} placeholder="6:3" aria-label="Satz 1" />
+                  <input class="adm-score" name="satz2" value={m.satz2 ?? ''} placeholder="6:4" aria-label="Satz 2" />
+                  <input class="adm-score" name="mtb" value={m.mtb ?? ''} placeholder="MTB" aria-label="Match-Tiebreak" />
+                  <button type="submit" name="action" value="save" class="adm-btn save">Speichern</button>
+                  {m.status !== 'open' && (
+                    <button type="submit" name="action" value="delete" class="adm-btn del" formnovalidate>✕</button>
+                  )}
+                </div>
+              </form>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  </main>
+
+  <style>
+    .auth-nav-link { cursor: pointer; background: transparent; border: none; font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: 1.1px; text-transform: uppercase; color: var(--color-muted); }
+    .auth-nav-link:hover { color: var(--color-deep-ink); }
+    .adm-score {
+      width: 3.6rem; min-height: 38px; border: 1px solid rgba(26,31,46,0.18); border-radius: 6px;
+      padding: 0.3rem 0.4rem; font: inherit; font-family: var(--font-mono); font-size: 13px;
+      background: rgba(255,255,255,0.85); outline: none; text-align: center;
+    }
+    .adm-score:focus { border-color: var(--color-deep-ink); }
+    .adm-btn { cursor: pointer; min-height: 38px; border-radius: 6px; padding: 0 0.7rem; border: 1px solid transparent; color: #fff; font-family: var(--font-mono); font-size: 10px; font-weight: 500; letter-spacing: 0.6px; text-transform: uppercase; }
+    .adm-btn.save { background: var(--color-deep-ink); border-color: var(--color-deep-ink); }
+    .adm-btn.del { background: transparent; border-color: rgba(179,64,47,0.5); color: var(--color-court-red); }
+    .adm-btn:active { transform: translateY(1px); }
+  </style>
+</Layout>

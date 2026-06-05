@@ -1,6 +1,8 @@
 // Authentifizierung: E-Mail + Passwort, Cookie-Session.
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
 import { getDb } from './db';
+
+const RESET_TTL_MIN = 60; // Passwort-Reset-Link gültig 60 Minuten
 
 export const SESSION_COOKIE = 'vm_session';
 const SESSION_TTL_DAYS = 30;
@@ -46,6 +48,35 @@ export function getPasswordHash(userId: number): string | null {
 
 export function setPassword(userId: number, password: string): void {
   getDb().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(password), userId);
+}
+
+// ── Passwort-Reset ──────────────────────────────────────────────────────────
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+export function createResetToken(userId: number): string {
+  const raw = randomBytes(32).toString('base64url');
+  const expires = new Date();
+  expires.setMinutes(expires.getMinutes() + RESET_TTL_MIN);
+  getDb().prepare('INSERT INTO reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)').run(userId, sha256(raw), expires.toISOString());
+  return raw;
+}
+
+// Verbraucht ein Reset-Token (einmalig) und liefert die user_id.
+export function consumeResetToken(raw: string): number | null {
+  const db = getDb();
+  const row = db.prepare('SELECT id, user_id, expires_at, used_at FROM reset_tokens WHERE token_hash = ?').get(sha256(raw)) as
+    | { id: number; user_id: number; expires_at: string; used_at: string | null }
+    | undefined;
+  if (!row || row.used_at || new Date(row.expires_at) < new Date()) return null;
+  db.prepare("UPDATE reset_tokens SET used_at = datetime('now') WHERE id = ?").run(row.id);
+  return row.user_id;
+}
+
+// Alle Sessions eines Users beenden (z. B. nach Passwort-Reset).
+export function destroyUserSessions(userId: number): void {
+  getDb().prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
 }
 
 // Legt den User an oder aktualisiert den Namensanspruch. Gibt den User zurück.

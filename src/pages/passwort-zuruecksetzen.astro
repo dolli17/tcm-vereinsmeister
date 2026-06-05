@@ -1,0 +1,56 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const params = Astro.url.searchParams;
+const token = params.get('token') ?? '';
+const error = params.get('error');
+const errorMsg =
+  error === 'token' ? 'Der Reset-Link ist ungültig oder abgelaufen. Bitte fordere einen neuen an.' :
+  error === 'pwlen' ? 'Das Passwort muss mindestens 8 Zeichen haben.' :
+  error === 'pwmatch' ? 'Die Passwörter stimmen nicht überein.' :
+  null;
+const noToken = !token;
+---
+
+<Layout title="Passwort zurücksetzen · Vereinsmeisterschaft">
+  <main class="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-10">
+    <a href="/login" class="label-mono text-club-blue">← Zur Anmeldung</a>
+    <h1 class="mt-5 font-serif text-4xl leading-tight text-deep-ink">Neues Passwort</h1>
+
+    {errorMsg && (
+      <div class="mt-6 rounded-sm border border-court-red/30 bg-court-red/5 px-4 py-3 text-[15px] text-deep-ink">{errorMsg}</div>
+    )}
+
+    {noToken ? (
+      <p class="mt-4 text-[15px] text-muted">Kein gültiger Link. <a class="text-club-blue underline" href="/passwort-vergessen">Reset-Link erneut anfordern</a>.</p>
+    ) : (
+      <form method="POST" action="/api/auth/reset" class="mt-6 grid gap-3">
+        <input type="hidden" name="token" value={token} />
+        <label class="block">
+          <span class="label-mono mb-1.5 block text-muted-2">Neues Passwort (min. 8 Zeichen)</span>
+          <input class="auth-input" type="password" name="password" required minlength="8" autocomplete="new-password" />
+        </label>
+        <label class="block">
+          <span class="label-mono mb-1.5 block text-muted-2">Passwort wiederholen</span>
+          <input class="auth-input" type="password" name="password2" required minlength="8" autocomplete="new-password" />
+        </label>
+        <button type="submit" class="auth-button">Passwort speichern</button>
+      </form>
+    )}
+  </main>
+
+  <style>
+    .auth-input {
+      width: 100%; min-height: 48px; border: 1px solid rgba(26, 31, 46, 0.18);
+      border-radius: 6px; padding: 0.75rem 0.9rem; color: var(--color-deep-ink);
+      background: rgba(255, 255, 255, 0.7); font: inherit; outline: none;
+    }
+    .auth-input:focus { border-color: var(--color-deep-ink); }
+    .auth-button {
+      cursor: pointer; min-height: 48px; border-radius: 6px;
+      border: 1px solid var(--color-deep-ink); background: var(--color-deep-ink); color: #fff;
+      font-family: var(--font-mono); font-size: 12px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase;
+    }
+    .auth-button:active { transform: translateY(1px); }
+  </style>
+</Layout>

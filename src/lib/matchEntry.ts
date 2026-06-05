@@ -142,6 +142,51 @@ export function getPlayerMatches(playerName: string, userId: number): PlayerMatc
   return out;
 }
 
+export type AdminFixture = {
+  wettbewerb: Wettbewerb;
+  wettbewerbLabel: string;
+  gruppe: number | null;
+  runde: string | null;
+  nr: number;
+  sideA: string[];
+  sideB: string[];
+  isBye: boolean;
+  status: ResultStatus;
+  satz1: string | null;
+  satz2: string | null;
+  mtb: string | null;
+  sieger: 'A' | 'B' | null;
+  result: string | null;
+  resultId: number | null;
+};
+
+// Alle Fixtures (ohne Freilose) mit ihrem aktuellen Ergebnis/Status — für die Admin-Verwaltung.
+export function getAllFixturesWithStatus(): AdminFixture[] {
+  const resultMap = relevantResultMap();
+  return allFixtures()
+    .filter((f) => f.sideA.length > 0 && f.sideB.length > 0)
+    .map((f) => {
+      const res = resultMap.get(matchKey(f.wettbewerb, { gruppe: f.gruppe, runde: f.runde, nr: f.nr }));
+      return {
+        wettbewerb: f.wettbewerb,
+        wettbewerbLabel: WETTBEWERB_LABEL[f.wettbewerb],
+        gruppe: f.gruppe,
+        runde: f.runde,
+        nr: f.nr,
+        sideA: f.sideA,
+        sideB: f.sideB,
+        isBye: false,
+        status: res ? res.status : 'open',
+        satz1: res?.satz1 ?? null,
+        satz2: res?.satz2 ?? null,
+        mtb: res?.mtb ?? null,
+        sieger: res?.sieger ?? null,
+        result: res && (res.status === 'confirmed' || res.status === 'pending') ? formatResult(res) : null,
+        resultId: res?.id ?? null,
+      };
+    });
+}
+
 // ── Score-Validierung ──────────────────────────────────────────────────────
 function parseSet(s: string): { a: number; b: number } | null {
   const m = s.trim().match(/^(\d+)\s*[:\-]\s*(\d+)$/);
