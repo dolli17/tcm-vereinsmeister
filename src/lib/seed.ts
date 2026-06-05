@@ -103,9 +103,11 @@ function ensureAdmins(db: Database.Database): void {
     .filter(Boolean);
   if (emails.length === 0) return;
 
+  // Admin-Accounts werden angelegt bzw. bestehende zum Admin gemacht UND freigegeben
+  // (ein Admin ist vertrauenswürdig; sein Namensanspruch gilt direkt).
   const upsert = db.prepare(
     `INSERT INTO users (email, role, claim_status) VALUES (?, 'admin', 'approved')
-     ON CONFLICT(email) DO UPDATE SET role = 'admin'`,
+     ON CONFLICT(email) DO UPDATE SET role = 'admin', claim_status = 'approved'`,
   );
   const tx = db.transaction(() => {
     for (const email of emails) upsert.run(email);
