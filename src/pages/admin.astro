@@ -3,6 +3,7 @@ import Layout from '../layouts/Layout.astro';
 import { getDb } from '../lib/db';
 import { findFixture, type Wettbewerb } from '../lib/fixtures';
 import { getEinzelMatches, getDoppelMatches, getMixedMatches } from '../lib/results';
+import { getOverdueMatches, type OverdueMatch } from '../lib/matchEntry';
 
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/login');
@@ -54,6 +55,15 @@ const stats = [
   { label: 'Damen Doppel', g: played(dd), t: playable(dd) },
   { label: 'Mixed Doppel', g: played(mx), t: playable(mx) },
 ];
+
+// Überfällige Spiele (Frist vor dem aktuellen Monat, noch offen), nach Konkurrenz gruppiert.
+const overdueGroups: { label: string; items: OverdueMatch[] }[] = [];
+for (const m of getOverdueMatches()) {
+  let g = overdueGroups.find((x) => x.label === m.wettbewerbLabel);
+  if (!g) { g = { label: m.wettbewerbLabel, items: [] }; overdueGroups.push(g); }
+  g.items.push(m);
+}
+const overdueCount = overdueGroups.reduce((n, g) => n + g.items.length, 0);
 
 function describe(r: ResRow) {
   const fx = findFixture(r.wettbewerb as Wettbewerb, { gruppe: r.gruppe, runde: r.runde, nr: r.match_nr });
@@ -120,6 +130,33 @@ const fmtDate = (s: string) => s.slice(8, 10) + '.' + s.slice(5, 7) + '. ' + s.s
         ))}
       </div>
       <a href="/admin/spiele" class="mt-3 inline-block rounded-sm border border-deep-ink bg-deep-ink px-4 py-2.5 font-mono text-[12px] font-medium uppercase tracking-wider text-white">Spiele verwalten / Ergebnis eintragen</a>
+    </section>
+
+    <section class="mt-10">
+      <h2 class="font-serif text-2xl text-deep-ink">Überfällige Spiele <span class={overdueCount ? 'text-court-red' : 'text-muted-2'}>({overdueCount})</span></h2>
+      <p class="mt-1 text-sm text-muted">Offene Spiele, deren Frist vor dem aktuellen Monat lag. (Doppel/Mixed: 1. Runde = Mai.)</p>
+      {overdueCount === 0 ? (
+        <p class="mt-2 text-muted">Keine überfälligen Spiele 🎉</p>
+      ) : (
+        <div class="mt-3 space-y-4">
+          {overdueGroups.map((g) => (
+            <div>
+              <div class="label-mono mb-1.5 text-court-red">{g.label} ({g.items.length})</div>
+              <ul class="grid gap-1">
+                {g.items.map((m) => (
+                  <li class="flex items-baseline justify-between gap-3 rounded-sm border border-court-red/20 bg-court-red/5 px-3 py-2 text-[15px]">
+                    <span class="text-deep-ink">
+                      <span class="font-mono text-[11px] text-muted-2">{m.context} · #{String(m.nr).padStart(2, '0')}</span>
+                      {' '}{m.sideA.join(' / ')} <span class="text-muted-2">vs</span> {m.sideB.join(' / ')}
+                    </span>
+                    <span class="shrink-0 font-mono text-[11px] uppercase tracking-wider text-court-red">fällig {m.dueName}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
 
     <section class="mt-8">

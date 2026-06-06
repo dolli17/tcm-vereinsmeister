@@ -10,6 +10,7 @@ import {
   teamPlayers,
   type Wettbewerb,
 } from './fixtures';
+import { getEinzelMatches, getDoppelMatches, getMixedMatches } from './results';
 
 export type ResultStatus = 'open' | 'pending' | 'confirmed' | 'rejected';
 
@@ -185,6 +186,51 @@ export function getAllFixturesWithStatus(): AdminFixture[] {
         resultId: res?.id ?? null,
       };
     });
+}
+
+// ── Überfällige Spiele (für Admin-Übersicht) ────────────────────────────────
+const MONTH_NAME2NUM: Record<string, number> = { Mai: 5, Juni: 6, Juli: 7 };
+const NUM2MONTH: Record<number, string> = { 5: 'Mai', 6: 'Juni', 7: 'Juli' };
+
+export type OverdueMatch = {
+  wettbewerbLabel: string;
+  context: string;
+  nr: number;
+  sideA: string[];
+  sideB: string[];
+  dueName: string;
+};
+
+// Offene Spiele, deren Fälligkeitsmonat VOR dem aktuellen Monat liegt.
+// Doppel/Mixed: 1. Runde = Mai fällig; spätere Runden ohne feste Frist.
+export function getOverdueMatches(now: Date = new Date()): OverdueMatch[] {
+  const cur = now.getMonth() + 1;
+  const open = (s: 'A' | 'B' | null) => s !== 'A' && s !== 'B';
+  const out: OverdueMatch[] = [];
+  const push = (label: string, context: string, nr: number, a: string[], b: string[], dueNum: number | null) => {
+    if (a.length === 0 || b.length === 0) return; // Freilos/Platzhalter
+    if (dueNum == null || dueNum >= cur) return; // nicht überfällig
+    out.push({ wettbewerbLabel: label, context, nr, sideA: a, sideB: b, dueName: NUM2MONTH[dueNum] ?? String(dueNum) });
+  };
+  const dueOfRound = (r: string) => (r === '1. Runde' ? 5 : null);
+
+  for (const k of ['herren', 'damen'] as Wettbewerb[]) {
+    for (const m of getEinzelMatches(k as 'herren' | 'damen')) {
+      if (!open(m.sieger)) continue;
+      push(WETTBEWERB_LABEL[k], `Gruppe ${m.gruppe}`, m.nr, [m.spielerA], [m.spielerB], MONTH_NAME2NUM[m.monat] ?? null);
+    }
+  }
+  for (const w of ['doppel', 'damen-doppel'] as ('doppel' | 'damen-doppel')[]) {
+    for (const m of getDoppelMatches(w)) {
+      if (!open(m.sieger)) continue;
+      push(WETTBEWERB_LABEL[w], m.runde, m.nr, teamPlayers(m.doppelA), teamPlayers(m.doppelB), dueOfRound(m.runde));
+    }
+  }
+  for (const m of getMixedMatches()) {
+    if (!open(m.sieger)) continue;
+    push(WETTBEWERB_LABEL['mixed'], m.runde, m.nr, teamPlayers(m.teamA), teamPlayers(m.teamB), dueOfRound(m.runde));
+  }
+  return out;
 }
 
 // ── Score-Validierung ──────────────────────────────────────────────────────
