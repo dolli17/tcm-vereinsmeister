@@ -49,9 +49,24 @@ sie sich selbst aus den JSON-Fixtures (Spieler + bereits eingetragene Ergebnisse
 
 ## Backup
 
+Automatisch: das Skript `/root/vm-backup.sh` läuft per Cron **täglich um 03:00** und legt
+einen konsistenten, gepackten Snapshot unter `/root/vm-backups/` ab (14 Tage Aufbewahrung,
+Log in `/root/vm-backups/backup.log`). Der Snapshot wird WAL-sicher per `VACUUM INTO` erzeugt
+(einfaches Kopieren der `.sqlite` im laufenden Betrieb wäre inkonsistent).
+
+Manuell auslösen:
 ```bash
-docker run --rm -v vm-data:/data -v "$PWD":/backup busybox \
-  cp /data/vm.sqlite /backup/vm-backup-$(date +%F).sqlite
+/root/vm-backup.sh
+```
+
+**Wiederherstellen** aus einem Backup:
+```bash
+cd ~/tcm-vereinsmeister
+docker compose stop app
+gzip -dc /root/vm-backups/vm-DATUM.sqlite.gz > /tmp/restore.sqlite
+docker cp /tmp/restore.sqlite tcm-vereinsmeister-app-1:/data/vm.sqlite
+docker exec tcm-vereinsmeister-app-1 rm -f /data/vm.sqlite-wal /data/vm.sqlite-shm   # alte WAL-Reste entfernen
+docker compose start app
 ```
 
 ## Cutover (später)
