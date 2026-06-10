@@ -10,11 +10,13 @@ import {
   getMatchRows,
   getSeason,
   monthIndex,
+  syncBracketForMatch,
   teamPlayers,
   type Competition,
   type EnrichedMatch,
   type ErgebnisTyp,
 } from './tournament';
+import { logAction } from './audit';
 
 export type ResultStatus = 'open' | 'pending' | 'confirmed' | 'rejected';
 
@@ -282,6 +284,49 @@ export function getOverdueMatches(now: Date = new Date(), seasonId?: number): Ov
     out.push({ matchId: m.id, wettbewerbLabel: comp.name, context, nr: m.nr, sideA: a, sideB: b, dueName: `${m.monat} ${season.jahr}` });
   }
   return out;
+}
+
+// ── Admin-Ergebnis setzen/löschen ───────────────────────────────────────────
+// Maßgebliche Eintragung (Admin oder API-Token): bestehende Datensätze des
+// Spiels werden ersetzt, das Ergebnis ist sofort bestätigt, das KO-Bracket
+// wird synchronisiert und die Aktion protokolliert.
+export function adminSetResult(
+  matchId: number,
+  entry: EntryInput,
+  admin: { id: number; email: string },
+): { ok: true; score: EntryScore; fixture: FixtureRef } | { ok: false; error: string } {
+  const fixture = findFixtureById(matchId);
+  if (!fixture) return { ok: false, error: 'Unbekanntes Match.' };
+
+  const valid = validateEntry(entry);
+  if (!valid.ok) return valid;
+  const s = valid.score;
+
+  const db = getDb();
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM results WHERE match_id = ?').run(matchId);
+    db.prepare(
+      `INSERT INTO results (match_id, wettbewerb, gruppe, runde, match_nr, satz1, satz2, mtb, sieger, ergebnis_typ, status, decided_by, decided_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, datetime('now'))`,
+    ).run(matchId, fixture.wettbewerb, fixture.gruppe, fixture.runde, fixture.nr, s.satz1, s.satz2, s.mtb, s.sieger, s.typ, admin.id);
+  });
+  tx();
+  syncBracketForMatch(matchId);
+  const label = `${fixture.wettbewerbLabel}: ${fixture.sideA.join(' / ')} vs ${fixture.sideB.join(' / ')}`;
+  logAction(admin, 'ergebnis_eingetragen', `${label} — ${[s.satz1, s.satz2, s.mtb].filter(Boolean).join(' · ') || s.typ}`);
+  return { ok: true, score: s, fixture };
+}
+
+export function adminDeleteResult(
+  matchId: number,
+  admin: { id: number; email: string },
+): { ok: true; fixture: FixtureRef } | { ok: false; error: string } {
+  const fixture = findFixtureById(matchId);
+  if (!fixture) return { ok: false, error: 'Unbekanntes Match.' };
+  getDb().prepare('DELETE FROM results WHERE match_id = ?').run(matchId);
+  syncBracketForMatch(matchId);
+  logAction(admin, 'ergebnis_geloescht', `${fixture.wettbewerbLabel}: ${fixture.sideA.join(' / ')} vs ${fixture.sideB.join(' / ')}`);
+  return { ok: true, fixture };
 }
 
 // ── Score-Validierung ──────────────────────────────────────────────────────
