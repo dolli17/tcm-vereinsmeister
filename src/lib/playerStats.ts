@@ -120,10 +120,14 @@ export function getPlayerStats(name: string, seasonId?: number): PlayerStats {
         const gruppe = cp?.gruppe ?? matches.find((m) => m.gruppe != null)?.gruppe ?? null;
         const standing = gruppe != null ? computeStandings(comp.id, gruppe).find((r) => r.name === name) ?? null : null;
         if (standing) punkte += standing.punkte;
+        // Punkteaufschlüsselung nur für Gruppenspiele — K.o.-Spiele zählen nicht
+        // fürs Tabellen-Punktesystem und erscheinen als eigene Match-Liste.
         const breakdowns = matches
+          .filter((m) => m.gruppe != null)
           .map((m) => explainMatchPoints(m, name))
           .filter((b): b is MatchPointBreakdown => Boolean(b));
-        competitions.push({ competition: comp, gruppe, standing, breakdowns, teamMatches: [], gespielt: played, total: playable.length });
+        const koMatches = matches.filter((m) => m.runde != null).map((m) => teamView(m, name));
+        competitions.push({ competition: comp, gruppe, standing, breakdowns, teamMatches: koMatches, gespielt: played, total: playable.length });
       } else {
         const teamMatches = matches.map((m) => teamView(m, name));
         competitions.push({ competition: comp, gruppe: null, standing: null, breakdowns: [], teamMatches, gespielt: played, total: playable.length });

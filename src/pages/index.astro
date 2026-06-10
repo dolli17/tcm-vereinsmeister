@@ -34,9 +34,11 @@ const panels = competitions.map((comp) => {
       // im Spielplan sichtbar bleiben.
       list: matches.filter((m) => (m.monat ?? '') === mo).sort((a, b) => a.nr - b.nr),
     })).filter((g) => g.list.length > 0);
-    return { comp, kind: 'gruppe' as const, matches, gruppen, monate, planByMonth };
+    // KO-Phase nach der Gruppenphase: Spiele mit Runde statt Gruppe.
+    const hatKo = matches.some((m) => m.runde != null);
+    return { comp, kind: 'gruppe' as const, matches, gruppen, monate, planByMonth, hatKo };
   }
-  return { comp, kind: 'ko' as const, matches, gruppen: [], monate: [], planByMonth: [] };
+  return { comp, kind: 'ko' as const, matches, gruppen: [], monate: [], planByMonth: [], hatKo: true };
 });
 
 // Fortschritt über alle Konkurrenzen (Freilose/Platzhalter ausgenommen).
@@ -74,6 +76,7 @@ const stati = ['Alle', 'Offen', 'Gespielt'];
                 <div class="seg">
                   <button data-view="tab" data-on="1">Tabellen</button>
                   <button data-view="plan" data-on="0">Spielplan</button>
+                  {p.hatKo && <button data-view="ko" data-on="0">K.o.-Runde</button>}
                 </div>
               </div>
 
@@ -104,7 +107,7 @@ const stati = ['Alle', 'Offen', 'Gespielt'];
                             <div class="match-no">#{m.nr}</div>
                             <div class="match-body">
                               <div class={`match-side ${m.sieger === 'A' ? 'win' : ''}`}><span class="nm">{m.sideA}</span></div>
-                              <div class="match-vs">Gruppe {m.gruppe}</div>
+                              <div class="match-vs">{m.gruppe != null ? `Gruppe ${m.gruppe}` : m.runde ?? 'K.o.'}</div>
                               <div class={`match-side ${m.sieger === 'B' ? 'win' : ''}`}><span class="nm">{m.sideB}</span></div>
                             </div>
                             <div class="match-meta">
@@ -119,6 +122,13 @@ const stati = ['Alle', 'Offen', 'Gespielt'];
                   ))}
                 </div>
               </div>
+
+              {p.hatKo && (
+                <div data-sub="ko" hidden>
+                  <div class="section-sub">K.o.-Runde der Gruppenbesten · Auslosung vor Ort</div>
+                  <KOView competition={p.comp} />
+                </div>
+              )}
             </>
           ) : (
             <>
@@ -150,16 +160,14 @@ const stati = ['Alle', 'Offen', 'Gespielt'];
     panels.forEach((p) => { p.hidden = p.dataset.panel !== i; });
   }));
 
-  // Tabellen/Spielplan-Umschalter je Panel
+  // Tabellen/Spielplan/K.o.-Umschalter je Panel
   document.querySelectorAll<HTMLElement>('[data-panel]').forEach((panel) => {
     const segBtns = panel.querySelectorAll<HTMLButtonElement>('[data-view]');
-    const subTab = panel.querySelector<HTMLElement>('[data-sub="tab"]');
-    const subPlan = panel.querySelector<HTMLElement>('[data-sub="plan"]');
+    const subs = panel.querySelectorAll<HTMLElement>('[data-sub]');
     segBtns.forEach((b) => b.addEventListener('click', () => {
       const v = b.dataset.view;
       segBtns.forEach((x) => x.dataset.on = x === b ? '1' : '0');
-      if (subTab) subTab.hidden = v !== 'tab';
-      if (subPlan) subPlan.hidden = v !== 'plan';
+      subs.forEach((s) => { s.hidden = s.dataset.sub !== v; });
     }));
 
     // Filter (Monat/Status) im Spielplan

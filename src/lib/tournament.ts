@@ -236,6 +236,27 @@ export function getMonate(competitionId: number): string[] {
   return Array.from(set).sort((a, b) => monthIndex(a) - monthIndex(b));
 }
 
+// Sieger der letzten K.o.-Runde (bestätigte Ergebnisse, Freilos-Seite rückt vor) —
+// Kandidaten für die Auslosung der nächsten Runde, wenn jede Runde neu gelost wird.
+export function getLastRoundWinners(competitionId: number): string[] {
+  const runden = getRunden(competitionId);
+  if (runden.length === 0) return [];
+  const last = runden[runden.length - 1];
+  const winners: string[] = [];
+  for (const m of getEnrichedMatches(competitionId)) {
+    if (m.runde !== last) continue;
+    if (m.sieger === 'A' && m.sideA) winners.push(m.sideA);
+    else if (m.sieger === 'B' && m.sideB) winners.push(m.sideB);
+    else {
+      const hatA = teamPlayers(m.sideA).length > 0;
+      const hatB = teamPlayers(m.sideB).length > 0;
+      if (hatA && !hatB && m.sideA) winners.push(m.sideA);
+      else if (hatB && !hatA && m.sideB) winners.push(m.sideB);
+    }
+  }
+  return winners;
+}
+
 // ── KO-Automatik ─────────────────────────────────────────────────────────────
 // Schreibt den Sieger eines Matches in alle Folgematches (source_match_a/b).
 // Ohne bestätigtes Ergebnis wird der Anzeige-Platzhalter wiederhergestellt —

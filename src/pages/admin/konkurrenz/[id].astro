@@ -1,6 +1,7 @@
 ---
 import AdminShell from '../../../components/AdminShell.astro';
-import { getCompetition, getCompetitionPlayers, getMatchRows, MONTH_ORDER } from '../../../lib/tournament';
+import { getCompetition, getCompetitionPlayers, getLastRoundWinners, getMatchRows, MONTH_ORDER } from '../../../lib/tournament';
+import { getGruppenQuali } from '../../../lib/standings';
 import { getAllPlayerNames } from '../../../lib/playerStats';
 import { listRegistrations } from '../../../lib/registrations';
 
@@ -26,14 +27,31 @@ const okMsg: Record<string, string> = {
   match: 'Paarung gespeichert.', matchdel: 'Paarung gelöscht.', comp: 'Konkurrenz aktualisiert.',
   generated: `Spielplan erzeugt${genN ? ` — ${genN} neue Paarung(en)` : ''}.`,
   adopted: `Meldungen übernommen${genN ? ` — ${genN} neue Teilnehmer` : ''}.`,
+  koround: `K.o.-Runde eingetragen${genN ? ` — ${genN} Paarung(en)` : ''}.`,
 };
 const err = Astro.url.searchParams.get('error');
 const errMsg: Record<string, string> = {
   nomodus: 'Dieser Generator passt nicht zum Modus der Konkurrenz.',
   koexists: 'Es existieren bereits Paarungen — bitte erst alle löschen, dann neu erzeugen.',
   koplayers: 'Für ein KO-Bracket braucht es mindestens 2 Teilnehmer.',
+  koround: 'Bitte Rundenname und mindestens eine vollständige Paarung angeben.',
 };
 const isGruppe = comp.modus === 'gruppe';
+
+// ── Auslosung der K.o.-Runde ────────────────────────────────────────────────
+// Kandidaten: Sieger der letzten K.o.-Runde, davor (Gruppen-Konkurrenz) die
+// Quali-Plätze der Gruppen, sonst alle Teilnehmer.
+const koMatches = matches.filter((m) => m.runde != null);
+const quali = isGruppe ? getGruppenQuali(comp.id) : [];
+const lastWinners = getLastRoundWinners(comp.id);
+const kandidaten =
+  lastWinners.length > 0 ? lastWinners
+  : isGruppe ? quali.flatMap((q) => q.quali)
+  : players.map((p) => p.player_name);
+const pairRows = kandidaten.length >= 2 ? Math.floor(kandidaten.length / 2) : 4;
+const KO_RUNDEN = ['Achtelfinale', 'Viertelfinale', 'Halbfinale', 'Finale'];
+const rundeVorschlag =
+  ({ 2: 'Finale', 4: 'Halbfinale', 8: 'Viertelfinale', 16: 'Achtelfinale' } as Record<number, string>)[kandidaten.length] ?? '';
 ---
 
 <AdminShell title={`${comp.name} · Admin`} active="saison">
@@ -57,7 +75,8 @@ const isGruppe = comp.modus === 'gruppe';
   </div>
 
   <div class="admin-cols">
-    <!-- Paarungen (größere Spalte) -->
+    <!-- Linke Spalte: Paarungen + Auslosung -->
+    <div>
     <div class="panel">
       <h2>Paarungen <span class="ct">{matches.length}</span></h2>
       <p style="font-size:.82rem;color:var(--muted);margin-bottom:10px">Seite als „Name" (Einzel) bzw. „Name1 / Name2" (Doppel). Freilos = <code>BYE</code>.</p>
@@ -81,7 +100,7 @@ const isGruppe = comp.modus === 'gruppe';
           <input type="hidden" name="action" value="ko_generate" />
           <input type="hidden" name="competition_id" value={comp.id} />
           <button class="btn lime">⚙ KO-Bracket erzeugen ({players.length} Teilnehmer)</button>
-          <p style="font-size:.76rem;color:var(--muted);margin-top:6px">Sieger rücken nach bestätigtem Ergebnis automatisch in die nächste Runde vor.</p>
+          <p style="font-size:.76rem;color:var(--muted);margin-top:6px">Sieger rücken nach bestätigtem Ergebnis automatisch in die nächste Runde vor. Wird jede Runde neu ausgelost, stattdessen unten Runde für Runde eintragen.</p>
         </form>
       )}
 
@@ -90,7 +109,7 @@ const isGruppe = comp.modus === 'gruppe';
           <form method="POST" action="/api/admin/match" class="row-item" style="gap:6px;flex-wrap:nowrap">
             <input type="hidden" name="match_id" value={m.id} />
             <input class="score-in" style="width:3rem" name="nr" type="number" value={m.nr} aria-label="Nr" />
-            {isGruppe
+            {isGruppe && m.runde == null
               ? <input class="score-in" style="width:3.4rem" name="gruppe" type="number" value={m.gruppe ?? ''} placeholder="Gr." aria-label="Gruppe" />
               : <input class="input" style="min-height:38px;width:6.5rem" name="runde" value={m.runde ?? ''} placeholder="Runde" aria-label="Runde" />}
             <input class="input" style="min-height:38px;flex:1;min-width:90px" name="side_a" list="alle-spieler" value={m.side_a ?? ''} placeholder="Seite A" />
@@ -121,6 +140,59 @@ const isGruppe = comp.modus === 'gruppe';
         </select>
         <button class="btn sm" type="submit">+</button>
       </form>
+    </div>
+
+    <!-- Vor Ort geloste K.o.-Runde eintragen -->
+    <div class="panel">
+      <h2>K.o.-Runde auslosen</h2>
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:10px">
+        Die Paarungen werden vor Ort ausgelost und hier rundenweise eingetragen. Leere Zeilen werden ignoriert;
+        Sieger rücken <b>nicht</b> automatisch vor — die nächste Runde nach der Auslosung genauso eintragen.
+      </p>
+
+      {isGruppe && quali.length > 0 && (
+        <div style="border:1px dashed var(--line);border-radius:8px;padding:8px 12px;margin-bottom:12px">
+          {quali.map((q) => (
+            <div style="font-size:.84rem;padding:2px 0">
+              <b>Gruppe {q.gruppe}:</b>{' '}
+              {q.fertig
+                ? <>fertig ✓ · Quali: {q.quali.join(', ')}</>
+                : <span style="color:var(--muted)">noch {q.offen} Spiel{q.offen === 1 ? '' : 'e'} offen{q.quali.length > 0 ? ` · aktuell vorn: ${q.quali.join(', ')}` : ''}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+      {lastWinners.length > 0 && (
+        <p style="font-size:.84rem;margin-bottom:12px"><b>Sieger der letzten Runde:</b> {lastWinners.join(' · ')}</p>
+      )}
+
+      <datalist id="ko-kandidaten">{kandidaten.map((k) => <option value={k} />)}</datalist>
+      <datalist id="ko-runden">{KO_RUNDEN.map((r) => <option value={r} />)}</datalist>
+
+      <form method="POST" action="/api/admin/match" style="display:grid;gap:8px">
+        <input type="hidden" name="action" value="ko_round_create" />
+        <input type="hidden" name="competition_id" value={comp.id} />
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <label class="field" style="margin:0;flex:1;min-width:140px"><span class="lbl">Runde</span>
+            <input class="input" name="runde" list="ko-runden" value={rundeVorschlag} required placeholder="z. B. Halbfinale" autocomplete="off" />
+          </label>
+          <label class="field" style="margin:0"><span class="lbl">Fällig im Monat</span>
+            <select class="input" name="monat" style="min-height:38px">
+              <option value="">— offen —</option>
+              {MONTH_ORDER.map((mo) => <option value={mo}>{mo}</option>)}
+            </select>
+          </label>
+        </div>
+        {Array.from({ length: pairRows }).map(() => (
+          <div style="display:flex;gap:6px;align-items:center">
+            <input class="input" style="min-height:38px;flex:1;min-width:90px" name="side_a" list="ko-kandidaten" placeholder="Seite A" autocomplete="off" />
+            <span style="font-size:.78rem;color:var(--muted)">vs</span>
+            <input class="input" style="min-height:38px;flex:1;min-width:90px" name="side_b" list="ko-kandidaten" placeholder="Seite B" autocomplete="off" />
+          </div>
+        ))}
+        <button class="btn lime">🎲 Runde eintragen</button>
+      </form>
+    </div>
     </div>
 
     <!-- Teilnehmer -->

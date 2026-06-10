@@ -25,8 +25,10 @@ export function getSeasonHonours(seasonId: number): CompetitionHonour[] {
     const open = playable.filter((m) => !isPlayed(m) && !/^Sieger\s/i.test(m.sideA ?? '') && !/^Sieger\s/i.test(m.sideB ?? '')).length;
 
     const winners: { label: string; name: string }[] = [];
-    if (comp.modus === 'ko') {
-      const runden = getRunden(comp.id);
+    // K.o.-Runden vorhanden (reine KO-Konkurrenz oder KO-Phase nach der
+    // Gruppenphase) → der Finalsieger ist Vereinsmeister, nicht die Gruppensieger.
+    const runden = getRunden(comp.id);
+    if (runden.length > 0) {
       const finalRound = runden[runden.length - 1];
       const finals = matches.filter((m) => m.runde === finalRound);
       if (finals.length === 1 && isPlayed(finals[0])) {
@@ -34,7 +36,7 @@ export function getSeasonHonours(seasonId: number): CompetitionHonour[] {
         const name = f.sieger === 'A' ? f.sideA : f.sideB;
         if (name) winners.push({ label: 'Vereinsmeister', name });
       }
-    } else {
+    } else if (comp.modus !== 'ko') {
       for (const g of getGruppen(comp.id)) {
         const rows = computeStandings(comp.id, g);
         const first = rows[0];

@@ -4,7 +4,9 @@
 import {
   getCompetitionPlayers,
   getEnrichedMatches,
+  getGruppen,
   isPlayed,
+  teamPlayers,
   type EnrichedMatch,
   type ErgebnisTyp,
   type Sieger,
@@ -219,6 +221,24 @@ function h2hAggregate(name: string, matches: EnrichedMatch[]) {
     agg.spieleVerloren += s.spieleVerloren;
   }
   return agg;
+}
+
+// Quali-Status je Gruppe für die K.o.-Runde: Gruppe fertig (alle Spiele mit zwei
+// echten Seiten gespielt) + die beiden Erstplatzierten.
+export type GruppenQuali = { gruppe: number; fertig: boolean; offen: number; quali: string[] };
+
+export function getGruppenQuali(competitionId: number): GruppenQuali[] {
+  const matches = getEnrichedMatches(competitionId);
+  return getGruppen(competitionId).map((gruppe) => {
+    const playable = matches.filter(
+      (m) => m.gruppe === gruppe && teamPlayers(m.sideA).length > 0 && teamPlayers(m.sideB).length > 0,
+    );
+    const offen = playable.filter((m) => !isPlayed(m)).length;
+    const quali = computeStandings(competitionId, gruppe)
+      .filter((r) => r.platz <= 2)
+      .map((r) => r.name);
+    return { gruppe, fertig: playable.length > 0 && offen === 0, offen, quali };
+  });
 }
 
 // Einzelpunkte-Aufschlüsselung für die Spielerstatistik.
