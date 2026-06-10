@@ -24,7 +24,7 @@ Ergebniseintragung** mit Spieler-Accounts und Gegner-Bestätigung.
 - **Saison-Anmeldung** (`/anmeldung`): Meldefenster pro Saison, Admin übernimmt Meldungen als Teilnehmer.
 - **Generatoren**: Jeder-gegen-Jeden (Gruppen) und komplettes KO-Bracket mit Setzliste/Freilosen.
 - **Archiv & Rangliste**: `/archiv` (Vereinsmeister vergangener Saisons), `/rangliste` (ewige ELO-Wertung).
-- **Admin**: Dashboard mit Audit-Protokoll, CSV-Export, Erinnerungs-Mails (Cron, Monatsende).
+- **Admin**: Dashboard mit Audit-Protokoll, CSV-Export; Erinnerungs-Mails gezielt per Klick je überfälligem Spiel (der tägliche Cron prüft nur noch die Forderungs-Fristen).
 
 ## Entwicklung
 

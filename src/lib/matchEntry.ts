@@ -250,6 +250,7 @@ export function getAllFixturesWithStatus(seasonId?: number): AdminFixture[] {
 
 // ── Überfällige Spiele (für Admin-Übersicht) ────────────────────────────────
 export type OverdueMatch = {
+  matchId: number;
   wettbewerbLabel: string;
   context: string;
   nr: number;
@@ -278,7 +279,7 @@ export function getOverdueMatches(now: Date = new Date(), seasonId?: number): Ov
     const overdue = season.jahr < curYear || (season.jahr === curYear && dueIdx < cur);
     if (!overdue) continue;
     const context = m.gruppe != null ? `Gruppe ${m.gruppe}` : m.runde ?? '';
-    out.push({ wettbewerbLabel: comp.name, context, nr: m.nr, sideA: a, sideB: b, dueName: `${m.monat} ${season.jahr}` });
+    out.push({ matchId: m.id, wettbewerbLabel: comp.name, context, nr: m.nr, sideA: a, sideB: b, dueName: `${m.monat} ${season.jahr}` });
   }
   return out;
 }

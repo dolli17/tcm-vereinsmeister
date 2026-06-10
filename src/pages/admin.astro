@@ -83,12 +83,13 @@ const okMsg =
   ok === 'userdeleted' ? 'Account gelöscht.' :
   ok === 'casual' ? 'Casual-Zugriff geändert.' :
   ok === 'role' ? 'Admin-Rolle geändert.' :
-  ok === 'reminded' ? `Erinnerungen versendet (${params.get('n') ?? '0'} Mails).` : null;
+  ok === 'reminded' ? `Erinnerung versendet (${params.get('n') ?? '0'} Mail${params.get('n') === '1' ? '' : 's'}).` : null;
 const err = params.get('error');
 const errMsg =
   err === 'conflict' ? 'Es liegt bereits ein bestätigtes Ergebnis für dieses Spiel vor.' :
   err === 'score' ? 'Das eingegebene Ergebnis ist ungültig (z. B. 6:3 / 6:4, bei 1:1 ein Match-Tiebreak).' :
   err === 'self' ? 'Du kannst deinen eigenen Account nicht löschen.' :
+  err === 'noaccounts' ? 'Keiner der Beteiligten hat einen registrierten Account — Erinnerung nicht möglich.' :
   err ? 'Aktion fehlgeschlagen.' : null;
 
 const audit = listAuditLog(30);
@@ -100,6 +101,7 @@ const auditLabel: Record<string, string> = {
   saison_angelegt: 'Saison angelegt', saison_aktiviert: 'Saison aktiviert', saison_archiviert: 'Saison archiviert',
   konkurrenz_angelegt: 'Konkurrenz angelegt', konkurrenz_geloescht: 'Konkurrenz gelöscht',
   spielplan_generiert: 'Spielplan generiert', paarung_geloescht: 'Paarung gelöscht',
+  erinnerung_gesendet: 'Erinnerung gesendet',
 };
 
 const statusLabel: Record<string, string> = { approved: 'freigegeben', pending: 'wartet', rejected: 'gesperrt' };
@@ -194,9 +196,6 @@ const fmtDate = (s: string) => s.slice(8, 10) + '.' + s.slice(5, 7) + '. ' + s.s
           <a href="/admin/saison" class="btn block ghost">Saisons &amp; Konkurrenzen</a>
           <a href="/admin/spieler" class="btn block ghost">Spielerstamm pflegen</a>
           <a href="/admin/forderung" class="btn block ghost">Forderungsliste verwalten</a>
-          <form method="POST" action="/api/admin/reminders" onsubmit="return confirm('Erinnerungs-Mails für alle offenen, fälligen Spiele jetzt senden?')">
-            <button class="btn block lime">Erinnerungen jetzt senden</button>
-          </form>
           <a href="/api/admin/export" class="btn block ghost">Ergebnisse als CSV exportieren</a>
         </div>
       </div>
@@ -219,9 +218,13 @@ const fmtDate = (s: string) => s.slice(8, 10) + '.' + s.slice(5, 7) + '. ' + s.s
             <div style="margin-bottom:10px">
               <div style="font-family:var(--font-mono);font-size:.72rem;color:var(--danger);margin-bottom:4px">{g.label} ({g.items.length})</div>
               {g.items.map((m) => (
-                <div style="display:flex;justify-content:space-between;gap:8px;font-size:.85rem;padding:4px 0;border-bottom:1px solid var(--line)">
-                  <span>{m.sideA.join(' / ')} <span style="color:var(--muted)">vs</span> {m.sideB.join(' / ')}</span>
+                <div style="display:flex;align-items:center;gap:8px;font-size:.85rem;padding:4px 0;border-bottom:1px solid var(--line)">
+                  <span style="flex:1;min-width:0">{m.sideA.join(' / ')} <span style="color:var(--muted)">vs</span> {m.sideB.join(' / ')}</span>
                   <span style="font-family:var(--font-mono);color:var(--danger);white-space:nowrap">{m.context} · {m.dueName}</span>
+                  <form method="POST" action="/api/admin/reminders" onsubmit={`return confirm('Erinnerungs-Mail für ${m.sideA.join(' / ')} vs ${m.sideB.join(' / ')} an alle registrierten Beteiligten senden?')`}>
+                    <input type="hidden" name="match_id" value={m.matchId} />
+                    <button class="btn sm ghost" type="submit">✉ Erinnern</button>
+                  </form>
                 </div>
               ))}
             </div>
