@@ -1,7 +1,7 @@
 ---
 import AppShell from '../components/AppShell.astro';
 import { getActiveSeason, listSeasons } from '../lib/tournament';
-import { getPhone } from '../lib/players';
+import { getGeschlecht, getPhone } from '../lib/players';
 
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/login');
@@ -10,16 +10,18 @@ const season = getActiveSeason();
 const seasons = listSeasons();
 const approved = !!user.player_name && user.claim_status === 'approved';
 const currentPhone = approved ? (getPhone(user.player_name!) ?? '') : '';
+const currentGeschlecht = approved ? getGeschlecht(user.player_name!) : null;
 
 const params = Astro.url.searchParams;
 const ok = params.get('ok');
-const okMsg = ok === 'phone' ? 'Telefonnummer gespeichert.' : ok === 'pw' ? 'Passwort geändert.' : ok === 'name' ? 'Name geändert.' : null;
+const okMsg = ok === 'phone' ? 'Telefonnummer gespeichert.' : ok === 'pw' ? 'Passwort geändert.' : ok === 'name' ? 'Name geändert.' : ok === 'geschlecht' ? 'Geschlecht gespeichert.' : null;
 const error = params.get('error');
 const errorMsg =
   error === 'current' ? 'Das aktuelle Passwort ist falsch.' :
   error === 'pwlen' ? 'Das neue Passwort muss mindestens 8 Zeichen haben.' :
   error === 'pwmatch' ? 'Die neuen Passwörter stimmen nicht überein.' :
   error === 'phone' ? 'Bitte eine gültige Telefonnummer eingeben.' :
+  error === 'geschlecht' ? 'Bitte männlich oder weiblich auswählen.' :
   error === 'nameempty' ? 'Bitte einen Namen eingeben.' :
   error === 'nametaken' ? 'Dieser Name ist bereits vergeben.' :
   error === 'nameinvalid' ? 'Dieser Name ist nicht erlaubt (max. 60 Zeichen, keine Sonderzeichen wie „/", keine reservierten Begriffe).' :
@@ -45,6 +47,25 @@ const errorMsg =
         </form>
       ) : (
         <p class="section-sub" style="padding:0">Sobald dein Namensanspruch freigegeben ist, kannst du deinen Namen hier ändern.</p>
+      )}
+    </div>
+
+    <div class="card" style="padding:18px 16px;margin-bottom:14px">
+      <h2 class="section-title" style="padding:0 0 4px;font-size:1.3rem">Geschlecht</h2>
+      {approved ? (
+        <form method="POST" action="/api/settings/geschlecht" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+          <p class="section-sub" style="padding:0;flex-basis:100%">Bestimmt die Zuordnung zur Herren- bzw. Damen-Forderungsliste und zu den Konkurrenzen.</p>
+          <label class="field" style="margin:0;min-width:160px"><span class="lbl">Geschlecht</span>
+            <select class="input" name="geschlecht" required>
+              <option value="" disabled selected={currentGeschlecht == null}>auswählen …</option>
+              <option value="m" selected={currentGeschlecht === 'm'}>männlich</option>
+              <option value="w" selected={currentGeschlecht === 'w'}>weiblich</option>
+            </select>
+          </label>
+          <button type="submit" class="btn">Speichern</button>
+        </form>
+      ) : (
+        <p class="section-sub" style="padding:0">Sobald dein Namensanspruch freigegeben ist, kannst du dein Geschlecht hier pflegen.</p>
       )}
     </div>
 

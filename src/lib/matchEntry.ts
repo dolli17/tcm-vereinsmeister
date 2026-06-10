@@ -297,6 +297,15 @@ export type ValidScore = { satz1: string; satz2: string; mtb: string | null; sie
 export type EntryScore = { satz1: string | null; satz2: string | null; mtb: string | null; sieger: 'A' | 'B'; typ: ErgebnisTyp };
 export type EntryInput = { typ: string; satz1?: string | null; satz2?: string | null; mtb?: string | null; sieger?: string | null };
 
+// Spiegelt einen Satz-String (z. B. '6:2' → '2:6'). Eingaben erfolgen intuitiv
+// aus Sicht des Eintragenden; gespeichert wird immer aus Sicht von Seite A.
+export function flipSet(s: string | null | undefined): string | null {
+  const t = (s ?? '').trim();
+  if (!t) return null;
+  const m = t.match(/^(\d+)\s*[:\-]\s*(\d+)$/);
+  return m ? `${m[2]}:${m[1]}` : t; // Unlesbares unverändert lassen — validateEntry meldet den Fehler
+}
+
 export function validateEntry(input: EntryInput): { ok: true; score: EntryScore } | { ok: false; error: string } {
   const typ = ['gespielt', 'wo', 'aufgabe'].includes(input.typ) ? (input.typ as ErgebnisTyp) : 'gespielt';
 

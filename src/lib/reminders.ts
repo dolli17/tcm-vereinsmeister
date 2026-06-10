@@ -1,8 +1,11 @@
-// Erinnerungs-Mails für offene/überfällige Spiele der aktiven Saison.
-// Wird vom Cron (zeitfenster-gesteuert) und vom Admin-Button (force) genutzt.
+// Erinnerungs-Mails für offene/überfällige Spiele der aktiven Saison sowie
+// Frist-Erinnerungen der Forderungsliste. VM-Erinnerungen laufen nur am
+// Monatsende (Cron-Fenster), Ladder-Checks täglich.
 import { getDb } from './db';
 import { getActiveSeason, getCompetitions, getEnrichedMatches, monthIndex, teamPlayers } from './tournament';
 import { sendMail, mailLayout, button } from './mail';
+import { adminEmails, emailsForNames } from './notify';
+import { fmtDatum, type Challenge } from './ladder';
 
 type DueMatch = {
   matchId: number;
@@ -119,4 +122,79 @@ export async function runReminders(opts: { baseUrl: string; dry?: boolean }): Pr
   }
 
   return { cycle, matchesReminded: matches, mailsSent: mails, dry };
+}
+
+// ── Forderungsliste: Frist-Erinnerung + Ablauf-Info (täglich) ────────────────
+export type LadderReminderResult = { warned: number; expired: number; dry: boolean };
+
+// Einmal-Versand pro Forderung über reminders_sent (match_key = 'ladder:<id>:…').
+export async function runLadderReminders(opts: { baseUrl: string; dry?: boolean }): Promise<LadderReminderResult> {
+  const { baseUrl, dry = false } = opts;
+  const db = getDb();
+  const alreadySent = db.prepare('SELECT 1 FROM reminders_sent WHERE match_key = ? AND monat = ?');
+  const markSent = db.prepare('INSERT OR IGNORE INTO reminders_sent (match_key, monat) VALUES (?, ?)');
+  const ONCE = 'einmalig';
+
+  let warned = 0;
+  let expired = 0;
+
+  // 1) Fristerinnerung: 7 Tage vor Ablauf der 14-Tage-Frist an beide Beteiligte.
+  const warnRows = db
+    .prepare(
+      `SELECT * FROM challenges
+       WHERE status IN ('offen','ergebnis_pending')
+         AND deadline >= datetime('now') AND deadline <= datetime('now', '+7 days')`,
+    )
+    .all() as Challenge[];
+  for (const c of warnRows) {
+    const key = `ladder:${c.id}:warn`;
+    if (alreadySent.get(key, ONCE)) continue;
+    warned++;
+    if (dry) continue;
+    const emails = emailsForNames([c.challenger, c.challenged]);
+    if (emails.length > 0) {
+      await sendMail({
+        to: emails,
+        subject: `Forderung läuft ab: ${c.challenger} vs ${c.challenged}`,
+        html: mailLayout(
+          'Forderung bald fällig',
+          `<p>Die Forderung <strong>${c.challenger}</strong> gegen <strong>${c.challenged}</strong>
+           (Forderungsliste ${c.liste === 'herren' ? 'Herren' : 'Damen'}) muss bis zum
+           <strong>${fmtDatum(c.deadline)}</strong> gespielt sein.</p>
+           <p>Bitte vereinbart zeitnah einen Termin und tragt das Ergebnis ein.</p>
+           <p>${button(`${baseUrl}/forderung`, 'Zur Forderungsliste')}</p>`,
+        ),
+      });
+    }
+    markSent.run(key, ONCE);
+  }
+
+  // 2) Ablauf-Info an den Ranglistenbetreuer (Admin) zur Wertung.
+  const expiredRows = db
+    .prepare(
+      `SELECT * FROM challenges
+       WHERE status IN ('offen','ergebnis_pending') AND deadline < datetime('now')`,
+    )
+    .all() as Challenge[];
+  for (const c of expiredRows) {
+    const key = `ladder:${c.id}:expired`;
+    if (alreadySent.get(key, ONCE)) continue;
+    expired++;
+    if (dry) continue;
+    await sendMail({
+      to: adminEmails(),
+      subject: `Forderung abgelaufen: ${c.challenger} vs ${c.challenged}`,
+      html: mailLayout(
+        'Forderung abgelaufen',
+        `<p>Die 14-Tage-Frist der Forderung <strong>${c.challenger}</strong> gegen
+         <strong>${c.challenged}</strong> (Liste ${c.liste === 'herren' ? 'Herren' : 'Damen'}) ist am
+         ${fmtDatum(c.deadline)} abgelaufen, ohne dass ein Ergebnis bestätigt wurde.</p>
+         <p>Bitte im Admin-Bereich werten (kampflos für eine Seite oder verfallen lassen).</p>
+         <p>${button(`${baseUrl}/admin/forderung`, 'Zur Forderungs-Verwaltung')}</p>`,
+      ),
+    });
+    markSent.run(key, ONCE);
+  }
+
+  return { warned, expired, dry };
 }

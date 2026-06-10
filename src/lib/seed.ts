@@ -52,7 +52,17 @@ export function runSeed(db: Database.Database): void {
   seedConfirmedResults(db);
   migrateToSeasons(db);
   backfillBracketRefs(db);
+  backfillGeschlecht(db);
   ensureAdmins(db);
+}
+
+// Geschlecht aus den Einzel-Stammdaten ableiten (herren→m, damen→w). Idempotent;
+// alle übrigen Spieler pflegt der Admin bzw. die Registrierung.
+function backfillGeschlecht(db: Database.Database): void {
+  db.exec(`
+    UPDATE players SET geschlecht = 'm' WHERE geschlecht IS NULL AND konkurrenz = 'herren';
+    UPDATE players SET geschlecht = 'w' WHERE geschlecht IS NULL AND konkurrenz = 'damen';
+  `);
 }
 
 // Verknüpft "Sieger Match N"-Platzhalter (Altdaten) mit dem Quellmatch derselben

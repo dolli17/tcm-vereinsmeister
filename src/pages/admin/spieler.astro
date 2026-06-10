@@ -9,7 +9,7 @@ if (user.role !== 'admin') return Astro.redirect('/');
 const players = listPlayers();
 
 const ok = Astro.url.searchParams.get('ok');
-const okMsg: Record<string, string> = { phone: 'Telefonnummer gespeichert.', rename: 'Spieler umbenannt.', created: 'Spieler angelegt.' };
+const okMsg: Record<string, string> = { phone: 'Telefonnummer gespeichert.', rename: 'Spieler umbenannt.', created: 'Spieler angelegt.', geschlecht: 'Geschlecht gespeichert.' };
 const err = Astro.url.searchParams.get('error');
 const errMsg: Record<string, string> = { taken: 'Dieser Name ist bereits vergeben.', exists: 'Diesen Spieler gibt es bereits.', input: 'Eingabe ungültig.' };
 ---
@@ -27,6 +27,9 @@ const errMsg: Record<string, string> = { taken: 'Dieser Name ist bereits vergebe
     <form method="POST" action="/api/admin/player" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
       <input type="hidden" name="action" value="create" />
       <label class="field" style="margin:0;flex:1;min-width:200px"><span class="lbl">Name</span><input class="input" name="name" required placeholder="Vor- und Nachname" /></label>
+      <label class="field" style="margin:0"><span class="lbl">Geschlecht</span>
+        <select class="input" name="geschlecht"><option value="">—</option><option value="m">männlich</option><option value="w">weiblich</option></select>
+      </label>
       <label class="field" style="margin:0;min-width:170px"><span class="lbl">Telefon (optional)</span><input class="input" name="telefon" type="tel" placeholder="z. B. 0151 23456789" /></label>
       <button class="btn">Spieler anlegen</button>
     </form>
@@ -39,7 +42,7 @@ const errMsg: Record<string, string> = { taken: 'Dieser Name ist bereits vergebe
     </div>
     <div style="overflow-x:auto">
       <table class="adm-table">
-        <thead><tr><th>Umbenennen</th><th>Telefonnummer</th><th>Account</th></tr></thead>
+        <thead><tr><th>Umbenennen</th><th>Geschlecht</th><th>Telefonnummer</th><th>Account</th></tr></thead>
         <tbody>
           {players.map((p) => (
             <tr data-name={p.name.toLowerCase()}>
@@ -49,6 +52,18 @@ const errMsg: Record<string, string> = { taken: 'Dieser Name ist bereits vergebe
                   <input type="hidden" name="name" value={p.name} />
                   <input class="input" style="min-height:36px;min-width:180px" name="new_name" value={p.name} aria-label={`Name von ${p.name}`} />
                   <button class="btn sm">Speichern</button>
+                </form>
+              </td>
+              <td>
+                <form method="POST" action="/api/admin/player" style="display:flex;gap:6px;align-items:center">
+                  <input type="hidden" name="action" value="geschlecht" />
+                  <input type="hidden" name="name" value={p.name} />
+                  <select class="input" style="min-height:36px" name="geschlecht" aria-label={`Geschlecht von ${p.name}`}>
+                    <option value="" selected={p.geschlecht == null}>—</option>
+                    <option value="m" selected={p.geschlecht === 'm'}>m</option>
+                    <option value="w" selected={p.geschlecht === 'w'}>w</option>
+                  </select>
+                  <button class="btn sm ghost">✓</button>
                 </form>
               </td>
               <td>

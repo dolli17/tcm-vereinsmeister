@@ -70,6 +70,21 @@ const TARGET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strok
       ))}
     </>
   )}
+
+  <!-- Forderungsliste (Tannenbaum-System) — saisonunabhängig -->
+  <div class="info-block" id="forderung">
+    <div class="info-card">
+      <h3><span class="ic" set:html={TARGET} /> Forderungsliste — Tannenbaum-System</h3>
+      <div class="steps">
+        <div class="step"><span class="n"></span><p><b>Pyramide:</b> Die Rangliste ist ein Tannenbaum — Reihe 1 hat einen Platz, Reihe 2 zwei, Reihe 3 drei usw. Es gibt getrennte Listen für Herren und Damen; neue Spieler steigen unten ein (Einstieg nach Absprache mit dem Sportwart auch an passender Position).</p></div>
+        <div class="step"><span class="n"></span><p><b>Wen darf ich fordern?</b> Alle besser platzierten Spieler in <b>deiner eigenen Reihe</b> sowie in der <b>Reihe darüber ab deiner Position nach rechts</b>. Beispiel: Platz 13 (3. Position in Reihe 5) darf die Plätze 11 und 12 (eigene Reihe) sowie 9 und 10 (Reihe darüber) fordern. Sonderregel: Platz 3 darf auch Platz 1 fordern.</p></div>
+        <div class="step"><span class="n"></span><p><b>Sieg des Forderers:</b> Er übernimmt den Platz des Geforderten; der Geforderte und alle dazwischen rutschen je einen Platz nach hinten. <b>Niederlage:</b> Alles bleibt, der Forderer darf 7 Tage lang nicht erneut fordern.</p></div>
+        <div class="step"><span class="n"></span><p><b>Siegerrechte:</b> Der Sieger darf 2 Tage lang sofort erneut fordern und kann in dieser Zeit selbst nicht gefordert werden.</p></div>
+        <div class="step"><span class="n"></span><p><b>Frist:</b> Eine Forderung muss innerhalb von <b>14 Tagen</b> gespielt werden. Tritt der Geforderte nicht an, wertet der Sportwart das Match kampflos. Jeder Spieler kann denselben Gegner höchstens <b>zweimal pro Saison</b> fordern; pro Spieler läuft immer nur eine Forderung gleichzeitig.</p></div>
+        <div class="step"><span class="n"></span><p><b>Rückzug &amp; Modus:</b> Der Forderer kann bis 24 h vor dem vereinbarten Termin zurückziehen. Gespielt werden <b>zwei Gewinnsätze</b>, bei 1:1 ein Match-Tiebreak bis 10. Das Ergebnis trägt einer der Spieler ein, der Gegner bestätigt es.</p></div>
+      </div>
+    </div>
+  </div>
 </AppShell>
 
 <script>

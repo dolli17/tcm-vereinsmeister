@@ -22,17 +22,34 @@ export function updatePlayerPhone(name: string, phone: string): void {
   getDb().prepare('UPDATE players SET telefon = ? WHERE name = ?').run(value, name);
 }
 
-export type RosterPlayer = { name: string; telefon: string | null; account_email: string | null };
+export type Geschlecht = 'm' | 'w';
+export type RosterPlayer = { name: string; telefon: string | null; geschlecht: Geschlecht | null; account_email: string | null };
 
 // Globaler Spielerstamm inkl. Hinweis, ob ein freigegebener Account existiert.
 export function listPlayers(): RosterPlayer[] {
   return getDb()
     .prepare(
-      `SELECT p.name, p.telefon,
+      `SELECT p.name, p.telefon, p.geschlecht,
               (SELECT u.email FROM users u WHERE u.player_name = p.name AND u.claim_status = 'approved' LIMIT 1) AS account_email
        FROM players p ORDER BY p.name COLLATE NOCASE`,
     )
     .all() as RosterPlayer[];
+}
+
+export function getGeschlecht(name: string): Geschlecht | null {
+  const row = getDb().prepare('SELECT geschlecht FROM players WHERE name = ?').get(name) as
+    | { geschlecht: Geschlecht | null }
+    | undefined;
+  return row?.geschlecht ?? null;
+}
+
+// Setzt das Geschlecht; mit onlyIfNull wird ein bereits gepflegter Wert nicht überschrieben.
+export function setGeschlecht(name: string, geschlecht: Geschlecht, opts: { onlyIfNull?: boolean } = {}): void {
+  if (opts.onlyIfNull) {
+    getDb().prepare('UPDATE players SET geschlecht = ? WHERE name = ? AND geschlecht IS NULL').run(geschlecht, name);
+  } else {
+    getDb().prepare('UPDATE players SET geschlecht = ? WHERE name = ?').run(geschlecht, name);
+  }
 }
 
 // Spielernamen sind namensbasierte Fremdschlüssel (matches.side_a/b, teamPlayers
@@ -80,6 +97,10 @@ export function renamePlayer(oldName: string, newNameRaw: string): { ok: true } 
     for (const m of ms) upd.run(replaceInSide(m.side_a, oldName, newName), replaceInSide(m.side_b, oldName, newName), m.id);
     db.prepare('UPDATE casual_matches SET player_a = ? WHERE player_a = ?').run(newName, oldName);
     db.prepare('UPDATE casual_matches SET player_b = ? WHERE player_b = ?').run(newName, oldName);
+    db.prepare('UPDATE OR IGNORE ladder_players SET player_name = ? WHERE player_name = ?').run(newName, oldName);
+    db.prepare('UPDATE challenges SET challenger = ? WHERE challenger = ?').run(newName, oldName);
+    db.prepare('UPDATE challenges SET challenged = ? WHERE challenged = ?').run(newName, oldName);
+    db.prepare('UPDATE OR IGNORE registrations SET player_name = ? WHERE player_name = ?').run(newName, oldName);
   });
   tx();
   return { ok: true };

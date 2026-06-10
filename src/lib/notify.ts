@@ -19,7 +19,7 @@ function matchTitle(fixture: FixtureRef): string {
   return `${sideLabel(fixture.sideA)} vs ${sideLabel(fixture.sideB)}${ctx ? ` (${ctx})` : ''}`;
 }
 
-function adminEmails(): string[] {
+export function adminEmails(): string[] {
   const fromDb = (getDb().prepare("SELECT email FROM users WHERE role = 'admin'").all() as { email: string }[]).map((r) => r.email);
   if (fromDb.length > 0) return fromDb;
   return (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);

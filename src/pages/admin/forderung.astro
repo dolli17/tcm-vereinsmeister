@@ -1,0 +1,109 @@
+---
+import AdminShell from '../../components/AdminShell.astro';
+import {
+  LISTEN,
+  fmtDatum,
+  formatChallengeResult,
+  getLadderEntries,
+  getOpenChallenges,
+  getOverdueChallenges,
+  type Liste,
+} from '../../lib/ladder';
+import { getAllPlayerNames } from '../../lib/playerStats';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+if (user.role !== 'admin') return Astro.redirect('/');
+
+const alleNamen = getAllPlayerNames();
+const listeLabel = (l: Liste) => (l === 'herren' ? 'Herren' : 'Damen');
+const data = LISTEN.map((liste) => ({
+  liste,
+  entries: getLadderEntries(liste),
+  open: getOpenChallenges(liste),
+}));
+const overdue = getOverdueChallenges();
+
+const ok = Astro.url.searchParams.get('ok');
+const okMsg: Record<string, string> = {
+  added: 'Spieler einsortiert.', removed: 'Spieler entfernt.', moved: 'Reihenfolge geändert.',
+  penalty: 'Sanktion angewendet (10 Plätze zurück).', resolved: 'Forderung gewertet.',
+};
+const err = Astro.url.searchParams.get('error');
+const errMsg: Record<string, string> = {
+  schon_drauf: 'Dieser Spieler steht bereits auf der Liste.',
+  nicht_drauf: 'Dieser Spieler steht nicht auf der Liste.',
+  offene_forderung: 'Spieler steckt in einer offenen Forderung — erst die Forderung werten.',
+  unbekannt: 'Diesen Spieler gibt es nicht im Stamm.',
+  gone: 'Diese Forderung wurde bereits bearbeitet.',
+  rand: 'Verschieben nicht möglich (Listenrand).',
+};
+---
+
+<AdminShell title="Forderungsliste · Admin" active="forderung">
+  <h1 class="admin-h1">Forderungsliste (Tannenbaum-System)</h1>
+  <p style="color:var(--muted);margin-bottom:16px">Spieler einsortieren (Regel 6), Sanktionen (Regel 7) und überfällige Forderungen werten (Regel 12). Forderungen selbst sprechen die Spieler auf der <a href="/forderung" style="color:var(--accent)">Forderungsseite</a> aus.</p>
+
+  {ok && okMsg[ok] && <div class="notice ok">{okMsg[ok]}</div>}
+  {err && <div class="notice err">{errMsg[err] ?? 'Eingabe unvollständig oder ungültig.'}</div>}
+
+  <datalist id="alle-spieler">{alleNamen.map((n) => <option value={n} />)}</datalist>
+
+  {overdue.length > 0 && (
+    <div class="panel" style="margin-bottom:16px;border-color:color-mix(in srgb,var(--danger) 35%,var(--line))">
+      <h2>Überfällige Forderungen <span class="ct">{overdue.length}</span></h2>
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:10px">14-Tage-Frist abgelaufen. Kampflos für den Forderer = Plätze-Kaskade wie bei einem Sieg; kampflos für den Geforderten = keine Rangänderung + 7-Tage-Sperre für den Forderer.</p>
+      {overdue.map((c) => (
+        <div class="row-item" style="gap:8px;flex-wrap:wrap">
+          <div class="grow">
+            <div style="font-weight:600">⚔ {c.challenger} fordert {c.challenged} <span class="pill blocked">{c.tage} Tag{c.tage === 1 ? '' : 'e'} überfällig</span></div>
+            <div style="font-family:var(--font-mono);font-size:.76rem;color:var(--muted)">{listeLabel(c.liste)} · Frist {fmtDatum(c.deadline)}{c.status === 'ergebnis_pending' ? ` · unbestätigtes Ergebnis: ${formatChallengeResult(c)}` : ''}</div>
+          </div>
+          <div class="row-actions">
+            <form method="POST" action="/api/admin/ladder"><input type="hidden" name="action" value="resolve" /><input type="hidden" name="challenge_id" value={c.id} /><input type="hidden" name="outcome" value="kampflos_challenger" /><button class="btn sm lime">Kampflos {c.challenger}</button></form>
+            <form method="POST" action="/api/admin/ladder"><input type="hidden" name="action" value="resolve" /><input type="hidden" name="challenge_id" value={c.id} /><input type="hidden" name="outcome" value="kampflos_challenged" /><button class="btn sm">Kampflos {c.challenged}</button></form>
+            <form method="POST" action="/api/admin/ladder"><input type="hidden" name="action" value="resolve" /><input type="hidden" name="challenge_id" value={c.id} /><input type="hidden" name="outcome" value="verfallen" /><button class="btn sm ghost">Verfallen</button></form>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+
+  <div class="admin-cols">
+    {data.map((d) => (
+      <div class="panel">
+        <h2>{listeLabel(d.liste)} <span class="ct">{d.entries.length}</span></h2>
+
+        {d.open.length > 0 && (
+          <p style="font-size:.78rem;color:var(--muted);margin-bottom:10px">
+            Laufend: {d.open.map((c) => `${c.challenger} vs ${c.challenged} (bis ${fmtDatum(c.deadline)})`).join(' · ')}
+          </p>
+        )}
+
+        <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">
+          {d.entries.length === 0 && <p style="color:var(--muted)">Noch keine Spieler.</p>}
+          {d.entries.map((e) => (
+            <div class="row-item" style="gap:8px">
+              <span style="font-family:var(--font-mono);font-size:.78rem;color:var(--muted);width:2.2rem">#{e.rank}</span>
+              <span class="grow" style="font-weight:600">{e.player_name}</span>
+              <div class="row-actions">
+                <form method="POST" action="/api/admin/ladder"><input type="hidden" name="action" value="move" /><input type="hidden" name="liste" value={d.liste} /><input type="hidden" name="player_name" value={e.player_name} /><input type="hidden" name="dir" value="up" /><button class="btn sm ghost" aria-label="Nach oben">▲</button></form>
+                <form method="POST" action="/api/admin/ladder"><input type="hidden" name="action" value="move" /><input type="hidden" name="liste" value={d.liste} /><input type="hidden" name="player_name" value={e.player_name} /><input type="hidden" name="dir" value="down" /><button class="btn sm ghost" aria-label="Nach unten">▼</button></form>
+                <form method="POST" action="/api/admin/ladder" onsubmit={`return confirm('${e.player_name} als Sanktion 10 Plätze zurücksetzen?')`}><input type="hidden" name="action" value="penalty" /><input type="hidden" name="liste" value={d.liste} /><input type="hidden" name="player_name" value={e.player_name} /><button class="btn sm ghost" title="Sanktion: 10 Plätze zurück (Regel 7)">−10</button></form>
+                <form method="POST" action="/api/admin/ladder" onsubmit={`return confirm('${e.player_name} von der Liste entfernen?')`}><input type="hidden" name="action" value="remove" /><input type="hidden" name="liste" value={d.liste} /><input type="hidden" name="player_name" value={e.player_name} /><button class="btn sm ghost" aria-label="Entfernen">✕</button></form>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <form method="POST" action="/api/admin/ladder" style="border-top:1px solid var(--line);padding-top:12px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+          <input type="hidden" name="action" value="add" />
+          <input type="hidden" name="liste" value={d.liste} />
+          <label class="field" style="margin:0;flex:1;min-width:170px"><span class="lbl">Spieler</span><input class="input" name="player_name" list="alle-spieler" required placeholder="Name aus dem Stamm" autocomplete="off" /></label>
+          <label class="field" style="margin:0;width:110px"><span class="lbl">Position</span><input class="input" name="rank" type="number" min="1" placeholder="Ende" /></label>
+          <button class="btn">Einsortieren</button>
+        </form>
+      </div>
+    ))}
+  </div>
+</AdminShell>

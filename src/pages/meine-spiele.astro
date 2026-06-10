@@ -201,6 +201,7 @@ const statusInfo: Record<PlayerMatch['status'], { text: string; cls: string }> =
                       </select>
                     </label>
                     <button type="submit" class="btn sm">Eintragen</button>
+                    <span style="flex-basis:100%;font-size:.68rem;color:var(--muted)">Sätze aus deiner Sicht (6:3 = du führst).</span>
                   </form>
                 )}
                 {m.status === 'pending' && m.canDecide && (

@@ -20,23 +20,30 @@ const errorMsg =
   error === 'email' ? 'Bitte gib eine gültige E-Mail-Adresse ein.' :
   error === 'pwlen' ? 'Das Passwort muss mindestens 8 Zeichen haben.' :
   error === 'pwmatch' ? 'Die Passwörter stimmen nicht überein.' :
-  error === 'name' ? 'Bitte wähle deinen Namen aus der Liste.' :
+  error === 'name' ? 'Bitte gib einen gültigen Namen ein (Vor- und Nachname, keine Sonderzeichen).' :
+  error === 'geschlecht' ? 'Bitte wähle männlich oder weiblich aus.' :
   error === 'nametaken' ? 'Für diesen Namen gibt es bereits eine Registrierung. Bitte melde dich an oder kontaktiere den Sportwart.' :
   null;
 ---
 
-<AuthShell title="Registrieren · Vereinsmeisterschaft" heading="Registrieren" sub="Wähle deinen Namen, gib deine E-Mail an und lege ein Passwort fest. Ein Admin bestätigt anschließend, dass der Name zu dir gehört." back={{ href: '/', label: '← Zur Übersicht' }}>
+<AuthShell title="Registrieren · TC Muckensturm" heading="Registrieren" sub="Gib deinen Namen, deine E-Mail und ein Passwort an. Ein Admin bestätigt anschließend, dass der Name zu dir gehört — danach kannst du an Vereinsmeisterschaft und Forderungsliste teilnehmen." back={{ href: '/', label: '← Zur Übersicht' }}>
   {errorMsg && <div class="notice err">{errorMsg}</div>}
 
   <form method="POST" action="/api/auth/register">
     <label class="field">
       <span class="lbl">Dein Name</span>
-      <select class="input" name="player_name" required>
-        <option value="" disabled selected>Namen auswählen …</option>
-        {names.map((n) => <option value={n}>{n}</option>)}
-      </select>
-      <span style="display:block;margin-top:6px;font-size:.78rem;color:var(--muted)">Es werden nur hinterlegte, noch freie Spieler aufgelistet ({names.length} verfügbar).</span>
+      <input class="input" name="player_name" list="reg-spieler" required placeholder="Vor- und Nachname" autocomplete="name" />
+      <datalist id="reg-spieler">{names.map((n) => <option value={n} />)}</datalist>
+      <span style="display:block;margin-top:6px;font-size:.78rem;color:var(--muted)">Bist du schon als Spieler hinterlegt (z. B. Vereinsmeisterschaft), wähle deinen Namen aus den Vorschlägen. Neu im Verein? Trag einfach deinen vollen Namen ein.</span>
     </label>
+    <div class="field">
+      <span class="lbl">Geschlecht</span>
+      <div style="display:flex;gap:16px;padding:6px 2px">
+        <label style="display:flex;align-items:center;gap:6px"><input type="radio" name="geschlecht" value="m" required /> männlich</label>
+        <label style="display:flex;align-items:center;gap:6px"><input type="radio" name="geschlecht" value="w" required /> weiblich</label>
+      </div>
+      <span style="display:block;margin-top:2px;font-size:.78rem;color:var(--muted)">Für die Zuordnung zur Herren- bzw. Damen-Forderungsliste und zu den Konkurrenzen.</span>
+    </div>
     <label class="field"><span class="lbl">E-Mail</span><input class="input" type="email" name="email" required placeholder="du@example.com" autocomplete="email" /></label>
     <label class="field"><span class="lbl">Passwort (min. 8 Zeichen)</span><input class="input" type="password" name="password" required minlength="8" placeholder="••••••••" autocomplete="new-password" /></label>
     <label class="field"><span class="lbl">Passwort wiederholen</span><input class="input" type="password" name="password2" required minlength="8" placeholder="••••••••" autocomplete="new-password" /></label>

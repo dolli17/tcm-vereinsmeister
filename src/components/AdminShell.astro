@@ -1,7 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 
-type Props = { title?: string; active?: 'dashboard' | 'spiele' | 'saison' | 'spieler' };
+type Props = { title?: string; active?: 'dashboard' | 'spiele' | 'saison' | 'spieler' | 'forderung' };
 const { title, active } = Astro.props;
 ---
 
@@ -17,6 +17,7 @@ const { title, active } = Astro.props;
         <a href="/admin/spiele" data-on={active === 'spiele' ? '1' : '0'}>Spiele &amp; Ergebnisse</a>
         <a href="/admin/saison" data-on={active === 'saison' ? '1' : '0'}>Saisons &amp; Konkurrenzen</a>
         <a href="/admin/spieler" data-on={active === 'spieler' ? '1' : '0'}>Spieler</a>
+        <a href="/admin/forderung" data-on={active === 'forderung' ? '1' : '0'}>Forderungsliste</a>
         <a href="/">↗ Zur Website</a>
         <form method="POST" action="/api/auth/logout"><button type="submit">Abmelden</button></form>
       </nav>

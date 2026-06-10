@@ -156,6 +156,38 @@ function initSchema(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_termin_match ON termin_proposals (match_id);
 
+    -- Forderungsrangliste nach dem Tannenbaum-System (TBS): Pyramide je Liste
+    -- ('herren'/'damen'); Reihe/Spalte werden stets aus rank berechnet.
+    CREATE TABLE IF NOT EXISTS ladder_players (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      liste         TEXT NOT NULL,                -- 'herren' | 'damen'
+      player_name   TEXT NOT NULL,
+      rank          INTEGER NOT NULL,             -- 1 = Spitze; Eindeutigkeit im Code gepflegt
+      gesperrt_bis  TEXT,                         -- 7-Tage-Forderungssperre nach verlorener Forderung
+      geschuetzt_bis TEXT,                        -- 2-Tage-Schutz/Vorrecht des Siegers
+      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (liste, player_name)
+    );
+
+    CREATE TABLE IF NOT EXISTS challenges (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      liste         TEXT NOT NULL,
+      saison        INTEGER NOT NULL,             -- Jahr, für die "max. 2×/Saison"-Regel
+      challenger    TEXT NOT NULL,                -- player_name (namensbasiert wie überall)
+      challenged    TEXT NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'offen', -- offen|ergebnis_pending|gespielt|kampflos|verfallen|zurueckgezogen
+      deadline      TEXT NOT NULL,                -- created_at + 14 Tage
+      termin        TEXT,                         -- optional vereinbarte Spielzeit (24h-Rückzugsregel)
+      satz1 TEXT, satz2 TEXT, mtb TEXT,
+      ergebnis_typ  TEXT DEFAULT 'gespielt',      -- gespielt|wo|aufgabe|kampflos|zurueckgezogen
+      sieger        TEXT,                         -- 'challenger' | 'challenged'
+      eingetragen_von INTEGER REFERENCES users(id),
+      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      decided_at    TEXT,
+      decided_by    INTEGER REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_challenges_liste ON challenges (liste, status);
+
     -- Protokoll für nachvollziehbare Eingriffe (Admin-Aktionen, Ergebnis-Entscheidungen).
     CREATE TABLE IF NOT EXISTS audit_log (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -191,6 +223,13 @@ function initSchema(db: Database.Database): void {
   // Casual-Zugriff (Flag für den versteckten Head-to-Head-Bereich).
   if (!userCols.some((c) => c.name === 'casual_access')) {
     db.exec('ALTER TABLE users ADD COLUMN casual_access INTEGER NOT NULL DEFAULT 0');
+  }
+
+  // Migration: Geschlecht am Spielerstamm ('m' | 'w', NULL = unbekannt) — für
+  // getrennte Forderungslisten und künftige Konkurrenz-Zuordnung.
+  const playerCols = db.prepare('PRAGMA table_info(players)').all() as { name: string }[];
+  if (!playerCols.some((c) => c.name === 'geschlecht')) {
+    db.exec('ALTER TABLE players ADD COLUMN geschlecht TEXT');
   }
 
   // Migration: Meldefenster pro Saison (Selbst-Anmeldung der Spieler).

@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../lib/db';
-import { findFixtureById, validateEntry } from '../../lib/matchEntry';
+import { findFixtureById, flipSet, validateEntry } from '../../lib/matchEntry';
 import { notifyOpponent } from '../../lib/notify';
 
 export const POST: APIRoute = async ({ request, redirect, locals }) => {
@@ -36,15 +36,21 @@ export const POST: APIRoute = async ({ request, redirect, locals }) => {
   }
 
   // Sonderfälle (kampflos/Aufgabe): der Sieger kommt relativ zum Eintragenden
-  // ('me'/'opp') und wird serverseitig auf Seite A/B gemappt.
+  // ('me'/'opp') und wird serverseitig auf Seite A/B gemappt. Sätze werden aus
+  // Sicht des Eintragenden erfasst — steht er auf Seite B, wird gespiegelt
+  // (gespeichert wird immer aus A-Sicht).
   const siegerRel = String(form.get('sieger_rel') ?? '');
   const meineSeite: 'A' | 'B' = onA ? 'A' : 'B';
   const andereSeite: 'A' | 'B' = onA ? 'B' : 'A';
+  const flip = !onA;
+  const s1 = String(form.get('satz1') ?? '');
+  const s2 = String(form.get('satz2') ?? '');
+  const mtb = String(form.get('mtb') ?? '');
   const valid = validateEntry({
     typ: String(form.get('ergebnis_typ') ?? 'gespielt'),
-    satz1: String(form.get('satz1') ?? ''),
-    satz2: String(form.get('satz2') ?? ''),
-    mtb: String(form.get('mtb') ?? ''),
+    satz1: flip ? flipSet(s1) : s1,
+    satz2: flip ? flipSet(s2) : s2,
+    mtb: flip ? flipSet(mtb) : mtb,
     sieger: siegerRel === 'me' ? meineSeite : siegerRel === 'opp' ? andereSeite : null,
   });
   if (!valid.ok) return redirect(`/meine-spiele?error=score`);
