@@ -1,0 +1,99 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { hasCasualAccess } from '../lib/auth';
+import type { Season } from '../lib/tournament';
+
+type Props = {
+  title?: string;
+  active: 'comp' | 'me' | 'rules' | (string & {});
+  season?: Season | null;
+  seasons?: Season[];
+  showProgress?: boolean;
+  done?: number;
+  total?: number;
+};
+
+const { title, active, season = null, seasons = [], showProgress = false, done = 0, total = 0 } = Astro.props;
+const user = Astro.locals.user;
+const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+const ICON = {
+  trophy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 4h12v3a6 6 0 0 1-12 0V4z"/><path d="M6 5H3v2a3 3 0 0 0 3 3M18 5h3v2a3 3 0 0 1-3 3M9 14v3M15 14v3M8 20h8"/></svg>',
+  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>',
+  book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M4 19a2 2 0 0 1 2-2h12"/></svg>',
+  login: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>',
+  dots: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
+};
+
+const tabs = [
+  { id: 'comp', label: 'Wettbewerbe', href: '/', icon: ICON.trophy },
+  { id: 'me', label: 'Meine Spiele', href: '/meine-spiele', icon: ICON.user },
+  { id: 'rules', label: 'Regeln', href: '/regeln', icon: ICON.book },
+];
+---
+
+<Layout title={title}>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-row">
+        <a href="/" class="brand" style="text-decoration:none;color:inherit">
+          <img class="brand-logo" src="/tcm-logo.png" alt="TC Muckensturm" />
+          <div class="brand-text">
+            <div class="brand-club">TC Muckensturm</div>
+            <div class="brand-title">Vereinsmeisterschaft</div>
+          </div>
+        </a>
+
+        {season && (
+          <span class="season-pick">
+            <span class="season-pill">● Saison {season.jahr}</span>
+            {seasons.length > 1 && (
+              <select aria-label="Saison wählen" onchange="if(this.value)window.location.href='/?saison='+this.value">
+                {seasons.map((s) => <option value={s.jahr} selected={s.id === season.id}>{s.jahr}{s.status === 'archiviert' ? ' (Archiv)' : ''}</option>)}
+              </select>
+            )}
+          </span>
+        )}
+
+        {user ? (
+          <details class="menu">
+            <summary class="icon-btn" aria-label="Menü" set:html={ICON.dots} />
+            <div class="menu-pop">
+              <a href="/meine-spiele">Meine Spiele</a>
+              <a href="/einstellungen">Einstellungen</a>
+              {hasCasualAccess(user) && <a href="/casual">Casual</a>}
+              {user.role === 'admin' && <a href="/admin">Admin</a>}
+              <div class="sep"></div>
+              <form method="POST" action="/api/auth/logout"><button type="submit">Abmelden</button></form>
+            </div>
+          </details>
+        ) : (
+          <a href="/login" class="icon-btn" aria-label="Anmelden" set:html={ICON.login} />
+        )}
+      </div>
+
+      {showProgress && total > 0 && (
+        <div class="progress-wrap">
+          <div class="progress-meta">
+            <span class="lbl">Gespielte Partien</span>
+            <span class="val"><b>{done}</b> / {total}</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" style={`width:${pct}%`}></div></div>
+        </div>
+      )}
+    </header>
+
+    <div class="scroll">
+      <slot />
+    </div>
+
+    <nav class="tabbar">
+      {tabs.map((t) => (
+        <a href={t.href} data-on={active === t.id ? '1' : '0'} style="text-decoration:none">
+          <span class="ic-pill" set:html={t.icon} />
+          {t.label}
+        </a>
+      ))}
+    </nav>
+  </div>
+</Layout>

@@ -1,589 +1,112 @@
 ---
+import { getEnrichedMatches, getRunden, isPlayed, teamPlayers, type Competition, type EnrichedMatch } from '../lib/tournament';
 import { getPhoneMap } from '../lib/players';
 
-type Match = {
-  nr: number;
-  teamA: string | null;
-  teamB: string | null;
-  termin: string | null;
-  satz1: string | null;
-  satz2: string | null;
-  mtb: string | null;
-  sieger: 'A' | 'B' | null;
-};
+type Props = { competition: Competition };
+const { competition } = Astro.props;
 
-type Runde = {
-  name: string;
-  matches: Match[];
-};
-
-type TeamPlayer = {
-  name: string;
-  telefon?: string;
-};
-
-interface Props {
-  headline: string;
-  aktuelleRunde?: string;
-  hinweis: string;
-  runden: Runde[];
-  konkurrenzLabel?: string;
-}
-
-const {
-  headline,
-  aktuelleRunde = '',
-  hinweis,
-  runden = [],
-  konkurrenzLabel = headline,
-} = Astro.props;
-
-const phoneMap = getPhoneMap();
-const isEmpty = runden.length === 0 || runden.every((runde) => runde.matches.length === 0);
-
-// Bracket-Geometrie. Match-Höhe ist via .plan-team min-height fixiert,
-// damit padding-top und gap pro Runde exakt zwischen den vorigen Match-Mittelpunkten
-// landen. Wer hier dreht, muss auch die CSS-Werte unten anpassen.
-const MATCH_HEIGHT = 170; // px, plan-meta + 2 × plan-team (2-zeilig) + Borders
-const BASE_GAP = 20; // px, Abstand zwischen den Matches in Runde 1
-const PITCH = MATCH_HEIGHT + BASE_GAP; // Center-zu-Center-Distanz in Runde 1
-
-function isPlayed(match: Match): boolean {
-  return match.sieger === 'A' || match.sieger === 'B';
-}
-
-function formatResult(match: Match): string {
-  return [match.satz1, match.satz2, match.mtb].filter(Boolean).join(' · ');
-}
-
-function matchStatus(match: Match): 'gespielt' | 'terminiert' | 'offen' | 'bye' {
-  if (match.teamB === 'BYE') return 'bye';
-  if (isPlayed(match)) return 'gespielt';
-  if (match.termin) return 'terminiert';
-  return 'offen';
-}
-
+const phone = getPhoneMap();
 function whatsappHref(telefon: string): string {
-  const digits = telefon.replace(/\D/g, '');
-  const internationalNumber = digits.startsWith('00')
-    ? digits.slice(2)
-    : digits.startsWith('0')
-      ? `49${digits.slice(1)}`
-      : digits;
-  const text = encodeURIComponent('Hallo, ich melde mich wegen der Vereinsmeisterschaft.');
-  return `https://wa.me/${internationalNumber}?text=${text}`;
+  const d = telefon.replace(/\D/g, '');
+  const intl = d.startsWith('00') ? d.slice(2) : d.startsWith('0') ? `49${d.slice(1)}` : d;
+  return `https://wa.me/${intl}`;
+}
+const telHref = (t: string) => `tel:${t.replace(/[^\d+]/g, '')}`;
+const WA = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1 0 12 2zm5.8 14.2c-.2.7-1.4 1.3-2 1.4-.5.1-1.2.1-1.9-.1-.4-.1-1-.3-1.7-.6-3-1.3-4.9-4.3-5.1-4.5-.1-.2-1.2-1.6-1.2-3 0-1.4.7-2.1 1-2.4.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 1.9c.1.2.1.4 0 .5l-.4.6c-.1.1-.3.3-.1.6.1.3.6 1 1.3 1.6.9.8 1.6 1 1.9 1.2.2.1.4.1.6-.1l.7-.8c.2-.2.4-.2.6-.1l1.8.9c.2.1.4.2.5.3.1.2.1.9-.1 1.6z"/></svg>';
+const TEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7.1 4.1 8.3 6.7 7 8c.6 1.5 1.7 2.7 3.1 3.1l1.3-1.3 2.6 1.2-.2 2.2c0 .5-.4.9-.9.9-4.4-.1-8-3.7-8.1-8.1 0-.5.4-.9.9-.9l2.4-.1Z"/></svg>';
+
+const all = getEnrichedMatches(competition.id);
+const runden = getRunden(competition.id).map((name) => ({
+  name,
+  matches: all.filter((m) => m.runde === name).sort((a, b) => a.nr - b.nr),
+}));
+
+const isBye = (s: string | null) => s === 'BYE' || teamPlayers(s).length === 0;
+const isPlaceholder = (s: string | null) => !!s && /^Sieger /i.test(s);
+const setsWon = (m: EnrichedMatch): [number, number] => {
+  let a = 0, b = 0;
+  for (const s of [m.satz1, m.satz2, m.mtb]) {
+    if (!s) continue;
+    const [x, y] = s.split(':').map(Number);
+    if (x > y) a++; else if (y > x) b++;
+  }
+  return [a, b];
+};
+const scoreSummary = (m: EnrichedMatch) => {
+  if (m.ergebnisTyp === 'wo') return 'w.o.';
+  const [a, b] = setsWon(m);
+  return m.ergebnisTyp === 'aufgabe' ? `${a}:${b} aufg.` : `${a}:${b}`;
+};
+
+// Vereinsmeister: Sieger des letzten (Final-)Matches, falls gespielt.
+let champion: string | null = null;
+const lastRound = runden[runden.length - 1];
+if (lastRound && lastRound.matches.length === 1) {
+  const f = lastRound.matches[0];
+  if (isPlayed(f)) champion = f.sieger === 'A' ? f.sideA : f.sideB;
 }
 
-function getTeamPlayers(team: string | null): TeamPlayer[] {
-  if (!team || team === 'BYE' || team === 'TBD') return [];
-  return team.split('/').map((part) => {
-    const name = part.trim();
-    return {
-      name,
-      telefon: phoneMap[name],
-    };
-  });
+function teamCell(side: string | null, win: boolean, m: EnrichedMatch) {
+  return { names: teamPlayers(side), cls: isBye(side) ? 'bye' : isPlaceholder(side) ? 'tbd' : '', label: side, win };
 }
 ---
 
-{isEmpty ? (
-  <div class="rounded-sm border border-dashed border-deep-ink/15 bg-white/40 p-8 text-center sm:p-12">
-    <div class="label-mono text-court-red">KO-Baum</div>
-    <h2 class="mt-3 font-serif text-2xl text-deep-ink sm:text-3xl">Auslosung folgt</h2>
-    <p class="mx-auto mt-3 max-w-md text-sm text-muted">Sobald die Paarungen stehen, erscheint der Turnierbaum hier.</p>
-  </div>
-) : (
-  <div class="space-y-5 sm:space-y-6">
-    <section class="rounded-sm border border-club-blue/25 bg-white/60 px-4 py-3.5 shadow-[0_10px_34px_-30px_rgba(26,31,46,0.55)] backdrop-blur-sm sm:px-6">
-      <div class="label-mono text-club-blue">{konkurrenzLabel}</div>
-      <p class="mt-1.5 text-sm leading-relaxed text-muted sm:text-[15px]">{hinweis}</p>
-    </section>
-
-    <section class="space-y-4 sm:hidden">
-      {runden.map((runde) => (
-        <section class="overflow-hidden rounded-sm border border-deep-ink/10 bg-white/60 shadow-[0_10px_34px_-30px_rgba(26,31,46,0.55)] backdrop-blur-sm">
-          <header class="border-b border-deep-ink/10 bg-warm-sand-2/40 px-3.5 py-3.5">
-            <div class="label-mono text-club-blue">{runde.name}</div>
-          </header>
-          <div class="divide-y divide-deep-ink/8">
-            {runde.matches.map((match) => {
-              const status = matchStatus(match);
-              const result = formatResult(match);
+<div class="bracket-hint">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h13M11 7l5 5-5 5M21 5v14"/></svg>
+  Zum Navigieren seitlich wischen
+</div>
+<div class="bracket-scroll">
+  <div class="bracket">
+    {runden.map((rd, ri) => {
+      const playedR = rd.matches.filter(isPlayed).length;
+      const isFinalRound = ri === runden.length - 1;
+      return (
+        <div class="ko-round">
+          <div class="ko-round-h">{rd.name} <span class="ct">{playedR}/{rd.matches.length}</span></div>
+          <div class="ko-matches">
+            {rd.matches.map((m) => {
+              const bye = isBye(m.sideA) || isBye(m.sideB);
+              const a = teamCell(m.sideA, m.sieger === 'A', m);
+              const b = teamCell(m.sideB, m.sieger === 'B', m);
               return (
-                <article class="px-3.5 py-3.5">
-                  <div class="flex items-center justify-between gap-3 font-mono text-[11px] text-muted-2">
-                    <span>Match {String(match.nr).padStart(2, '0')}</span>
-                    <span>{status === 'gespielt' ? result : status === 'bye' ? 'BYE' : match.termin ?? 'offen'}</span>
+                <div class={`ko-match ${isFinalRound ? 'final' : ''}`}>
+                  <span class="ko-no">Match {m.nr}</span>
+                  {bye && <span class="ko-mtag">Freilos</span>}
+                  <div class={`ko-team ${a.win ? 'win' : ''} ${a.cls}`}>
+                    <span class="nm">{a.names.length ? a.names.map((n) => (
+                      <span class="pair">{n}{phone[n] && (
+                        <span class="contact">
+                          <a class="cico wa" href={whatsappHref(phone[n])} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp an ${n}`} set:html={WA} />
+                          <a class="cico tel" href={telHref(phone[n])} aria-label={`${n} anrufen`} set:html={TEL} />
+                        </span>
+                      )}</span>
+                    )) : <span class="pair">{a.label ?? 'offen'}</span>}</span>
+                    {a.win && isPlayed(m) && <span class="sc">{scoreSummary(m)}</span>}
                   </div>
-                  <div class="mt-2 space-y-2">
-                    <div class={`rounded-sm border px-3 py-2 ${match.sieger === 'A' || status === 'bye' ? 'border-deep-ink/20 bg-warm-sand-2/55 font-semibold text-deep-ink' : 'border-deep-ink/10 bg-white/65 text-deep-ink'}`}>
-                      {(match.teamA && match.teamA !== 'BYE') ? (
-                        <div class="team-players">
-                          {getTeamPlayers(match.teamA).map((player) => (
-                            <div class="team-player-row">
-                              <span class="truncate">{player.name}</span>
-                              {player.telefon && (
-                                <span class="contact-actions">
-                                  <a class="contact-link contact-link-whatsapp" href={whatsappHref(player.telefon)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp an ${player.name} öffnen`} title={`WhatsApp an ${player.name} öffnen`}>
-                                    <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M5.2 15.1 3 17l.7-2.8A7 7 0 1 1 5.2 15.1Z" /><path d="M7.2 6.9c.2-.4.4-.5.7-.5h.5c.2 0 .4.1.5.4l.5 1.2c.1.3 0 .5-.2.7l-.4.4c.5.9 1.2 1.6 2.1 2.1l.4-.4c.2-.2.5-.3.7-.2l1.2.5c.3.1.4.3.4.6v.5c0 .3-.2.5-.5.7-.6.3-1.3.3-2.2 0-1.8-.6-3.7-2.5-4.3-4.3-.3-.8-.3-1.5 0-2.1Z" /></svg>
-                                  </a>
-                                  <button class="contact-link contact-link-number" type="button" data-phone-open data-phone-name={player.name} data-phone-number={player.telefon} aria-label={`Telefonnummer von ${player.name} anzeigen`} title={`Telefonnummer von ${player.name} anzeigen`}>
-                                    <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M7.1 4.1 8.3 6.7 7 8c.6 1.5 1.7 2.7 3.1 3.1l1.3-1.3 2.6 1.2-.2 2.2c0 .5-.4.9-.9.9-4.4-.1-8-3.7-8.1-8.1 0-.5.4-.9.9-.9l2.4-.1Z" /><path d="M12.4 4.4h2.9v2.9" /><path d="m11.7 8 3.5-3.5" /></svg>
-                                  </button>
-                                </span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        match.teamA ?? 'TBD'
-                      )}
-                    </div>
-                    <div class="px-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-2">vs</div>
-                    <div class={`rounded-sm border px-3 py-2 ${match.sieger === 'B' ? 'border-deep-ink/20 bg-warm-sand-2/55 font-semibold text-deep-ink' : 'border-deep-ink/10 bg-white/65 text-deep-ink'}`}>
-                      {(match.teamB && match.teamB !== 'BYE') ? (
-                        <div class="team-players">
-                          {getTeamPlayers(match.teamB).map((player) => (
-                            <div class="team-player-row">
-                              <span class="truncate">{player.name}</span>
-                              {player.telefon && (
-                                <span class="contact-actions">
-                                  <a class="contact-link contact-link-whatsapp" href={whatsappHref(player.telefon)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp an ${player.name} öffnen`} title={`WhatsApp an ${player.name} öffnen`}>
-                                    <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M5.2 15.1 3 17l.7-2.8A7 7 0 1 1 5.2 15.1Z" /><path d="M7.2 6.9c.2-.4.4-.5.7-.5h.5c.2 0 .4.1.5.4l.5 1.2c.1.3 0 .5-.2.7l-.4.4c.5.9 1.2 1.6 2.1 2.1l.4-.4c.2-.2.5-.3.7-.2l1.2.5c.3.1.4.3.4.6v.5c0 .3-.2.5-.5.7-.6.3-1.3.3-2.2 0-1.8-.6-3.7-2.5-4.3-4.3-.3-.8-.3-1.5 0-2.1Z" /></svg>
-                                  </a>
-                                  <button class="contact-link contact-link-number" type="button" data-phone-open data-phone-name={player.name} data-phone-number={player.telefon} aria-label={`Telefonnummer von ${player.name} anzeigen`} title={`Telefonnummer von ${player.name} anzeigen`}>
-                                    <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M7.1 4.1 8.3 6.7 7 8c.6 1.5 1.7 2.7 3.1 3.1l1.3-1.3 2.6 1.2-.2 2.2c0 .5-.4.9-.9.9-4.4-.1-8-3.7-8.1-8.1 0-.5.4-.9.9-.9l2.4-.1Z" /><path d="M12.4 4.4h2.9v2.9" /><path d="m11.7 8 3.5-3.5" /></svg>
-                                  </button>
-                                </span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        match.teamB ?? 'TBD'
-                      )}
-                    </div>
+                  <div class={`ko-team ${b.win ? 'win' : ''} ${b.cls}`}>
+                    <span class="nm">{b.names.length ? b.names.map((n) => (
+                      <span class="pair">{n}{phone[n] && (
+                        <span class="contact">
+                          <a class="cico wa" href={whatsappHref(phone[n])} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp an ${n}`} set:html={WA} />
+                          <a class="cico tel" href={telHref(phone[n])} aria-label={`${n} anrufen`} set:html={TEL} />
+                        </span>
+                      )}</span>
+                    )) : <span class="pair">{b.label ?? 'offen'}</span>}</span>
+                    {b.win && isPlayed(m) && <span class="sc">{scoreSummary(m)}</span>}
                   </div>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-      ))}
-    </section>
-
-    <section class="hidden sm:block">
-      <div class="overflow-x-auto pb-4">
-        <div class="tournament-plan min-w-[1320px]">
-          <div class="label-mono mb-4 text-club-blue">Turnierplan</div>
-          <div class="tournament-grid">
-            {runden.map((runde, roundIndex) => {
-              // Pitch verdoppelt sich pro Runde (jedes Match steht mittig zwischen
-              // den beiden Vorrunden-Matches): pitch_n = 2^n · pitch_0.
-              // Daraus folgen padding-top und gap fürs round-body:
-              //   topOffset_n = (2^n − 1) · pitch_0 / 2
-              //   gap_n       = 2^n · pitch_0 − match_height
-              const topOffset = roundIndex === 0 ? 0 : ((2 ** roundIndex - 1) * PITCH) / 2;
-              const gap = roundIndex === 0 ? BASE_GAP : 2 ** roundIndex * PITCH - MATCH_HEIGHT;
-              // Klammer-Höhe der eingehenden Verbindung = halbe Vorrunden-Pitch.
-              const connectorHalf = roundIndex === 0 ? 0 : (2 ** (roundIndex - 1) * PITCH) / 2;
-              return (
-                <section class="round-column">
-                  <header class="round-header">{runde.name}</header>
-                  <div class="round-body" style={`padding-top:${topOffset}px; gap:${gap}px;`}>
-                    {runde.matches.map((match) => {
-                      const status = matchStatus(match);
-                      const result = formatResult(match);
-                      return (
-                        <article class={`plan-match ${status === 'bye' ? 'is-bye' : ''} ${roundIndex > 0 ? 'has-incoming' : ''}`} style={`--connector-half:${connectorHalf}px;`}>
-                          <div class="plan-meta">
-                            <span>Match {String(match.nr).padStart(2, '0')}</span>
-                            <span>{status === 'gespielt' ? result : status === 'bye' ? 'BYE' : match.termin ?? 'offen'}</span>
-                          </div>
-                          <div class={`plan-team ${match.sieger === 'A' || status === 'bye' ? 'is-winner' : ''}`}>
-                            {(match.teamA && match.teamA !== 'BYE') ? (
-                              <div class="team-players">
-                                {getTeamPlayers(match.teamA).map((player) => (
-                                  <div class="team-player-row">
-                                    <span class="truncate">{player.name}</span>
-                                    {player.telefon && (
-                                      <span class="contact-actions">
-                                        <a class="contact-link contact-link-whatsapp" href={whatsappHref(player.telefon)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp an ${player.name} öffnen`} title={`WhatsApp an ${player.name} öffnen`}>
-                                          <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M5.2 15.1 3 17l.7-2.8A7 7 0 1 1 5.2 15.1Z" /><path d="M7.2 6.9c.2-.4.4-.5.7-.5h.5c.2 0 .4.1.5.4l.5 1.2c.1.3 0 .5-.2.7l-.4.4c.5.9 1.2 1.6 2.1 2.1l.4-.4c.2-.2.5-.3.7-.2l1.2.5c.3.1.4.3.4.6v.5c0 .3-.2.5-.5.7-.6.3-1.3.3-2.2 0-1.8-.6-3.7-2.5-4.3-4.3-.3-.8-.3-1.5 0-2.1Z" /></svg>
-                                        </a>
-                                        <button class="contact-link contact-link-number" type="button" data-phone-open data-phone-name={player.name} data-phone-number={player.telefon} aria-label={`Telefonnummer von ${player.name} anzeigen`} title={`Telefonnummer von ${player.name} anzeigen`}>
-                                          <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M7.1 4.1 8.3 6.7 7 8c.6 1.5 1.7 2.7 3.1 3.1l1.3-1.3 2.6 1.2-.2 2.2c0 .5-.4.9-.9.9-4.4-.1-8-3.7-8.1-8.1 0-.5.4-.9.9-.9l2.4-.1Z" /><path d="M12.4 4.4h2.9v2.9" /><path d="m11.7 8 3.5-3.5" /></svg>
-                                        </button>
-                                      </span>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              match.teamA ?? 'TBD'
-                            )}
-                          </div>
-                          <div class="plan-divider"></div>
-                          <div class={`plan-team ${match.sieger === 'B' ? 'is-winner' : ''}`}>
-                            {(match.teamB && match.teamB !== 'BYE') ? (
-                              <div class="team-players">
-                                {getTeamPlayers(match.teamB).map((player) => (
-                                  <div class="team-player-row">
-                                    <span class="truncate">{player.name}</span>
-                                    {player.telefon && (
-                                      <span class="contact-actions">
-                                        <a class="contact-link contact-link-whatsapp" href={whatsappHref(player.telefon)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp an ${player.name} öffnen`} title={`WhatsApp an ${player.name} öffnen`}>
-                                          <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M5.2 15.1 3 17l.7-2.8A7 7 0 1 1 5.2 15.1Z" /><path d="M7.2 6.9c.2-.4.4-.5.7-.5h.5c.2 0 .4.1.5.4l.5 1.2c.1.3 0 .5-.2.7l-.4.4c.5.9 1.2 1.6 2.1 2.1l.4-.4c.2-.2.5-.3.7-.2l1.2.5c.3.1.4.3.4.6v.5c0 .3-.2.5-.5.7-.6.3-1.3.3-2.2 0-1.8-.6-3.7-2.5-4.3-4.3-.3-.8-.3-1.5 0-2.1Z" /></svg>
-                                        </a>
-                                        <button class="contact-link contact-link-number" type="button" data-phone-open data-phone-name={player.name} data-phone-number={player.telefon} aria-label={`Telefonnummer von ${player.name} anzeigen`} title={`Telefonnummer von ${player.name} anzeigen`}>
-                                          <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M7.1 4.1 8.3 6.7 7 8c.6 1.5 1.7 2.7 3.1 3.1l1.3-1.3 2.6 1.2-.2 2.2c0 .5-.4.9-.9.9-4.4-.1-8-3.7-8.1-8.1 0-.5.4-.9.9-.9l2.4-.1Z" /><path d="M12.4 4.4h2.9v2.9" /><path d="m11.7 8 3.5-3.5" /></svg>
-                                        </button>
-                                      </span>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              match.teamB ?? 'TBD'
-                            )}
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                </section>
+                </div>
               );
             })}
           </div>
         </div>
+      );
+    })}
+    <div class="ko-champ">
+      <div class="champ-card">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 4h12v3a6 6 0 0 1-12 0V4z"/><path d="M6 5H3v2a3 3 0 0 0 3 3M18 5h3v2a3 3 0 0 1-3 3M9 14v3M15 14v3M8 20h8"/></svg>
+        <div class="lbl">Vereinsmeister</div>
+        <div class="nm">{champion ?? 'offen'}</div>
       </div>
-    </section>
-  </div>
-)}
-
-<style>
-  .tournament-plan {
-    position: relative;
-  }
-
-  .tournament-grid {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(280px, 1fr);
-    gap: 2.25rem;
-    align-items: start;
-  }
-
-  .round-column {
-    position: relative;
-  }
-
-  .round-header {
-    margin-bottom: 1rem;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: var(--color-muted-2);
-  }
-
-  .round-body {
-    display: flex;
-    flex-direction: column;
-    position: relative;
-  }
-
-  .plan-match {
-    position: relative;
-    border: 1px solid rgba(26, 31, 46, 0.14);
-    background: rgba(255, 255, 255, 0.92);
-    box-shadow: 0 14px 36px -34px rgba(26, 31, 46, 0.8);
-  }
-
-  .plan-match::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    right: -2.25rem;
-    width: 2.25rem;
-    border-top: 1.5px solid rgba(26, 31, 46, 0.24);
-  }
-
-  .plan-match.has-incoming::before {
-    content: '';
-    position: absolute;
-    top: calc(50% - var(--connector-half, 0px));
-    left: -2.25rem;
-    width: 2.25rem;
-    height: calc(var(--connector-half, 0px) * 2);
-    border-top: 1.5px solid rgba(26, 31, 46, 0.24);
-    border-bottom: 1.5px solid rgba(26, 31, 46, 0.24);
-    border-right: 1.5px solid rgba(26, 31, 46, 0.24);
-  }
-
-  .round-column:last-child .plan-match::after {
-    display: none;
-  }
-
-  .plan-meta {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.55rem 0.75rem;
-    border-bottom: 1px solid rgba(26, 31, 46, 0.08);
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--color-muted-2);
-  }
-
-  .plan-team {
-    /* Fixe min-height (2 Zeilen + Padding) hält die Match-Höhe konstant,
-       damit die Bracket-Mathematik (MATCH_HEIGHT in KOView.astro) aufgeht. */
-    display: flex;
-    align-items: center;
-    min-height: calc(2 * 1.28rem + 1.6rem);
-    padding: 0.8rem 0.95rem;
-    background: rgba(255, 255, 255, 0.98);
-    color: var(--color-deep-ink);
-    font-size: 0.95rem;
-    line-height: 1.28rem;
-  }
-
-  .team-players {
-    display: flex;
-    width: 100%;
-    flex-direction: column;
-    gap: 0.38rem;
-  }
-
-  .team-player-row {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.55rem;
-  }
-
-  .contact-actions {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    gap: 0.25rem;
-  }
-
-  .contact-link {
-    display: inline-flex;
-    width: 1.35rem;
-    height: 1.35rem;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid rgba(26, 31, 46, 0.14);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.52);
-    text-decoration: none;
-    transition:
-      background-color 0.16s ease,
-      border-color 0.16s ease,
-      transform 0.16s ease;
-  }
-
-  .contact-link-whatsapp {
-    color: #1f7a4d;
-  }
-
-  .contact-link-number {
-    color: var(--color-club-blue);
-    cursor: pointer;
-  }
-
-  .contact-link:hover {
-    border-color: rgba(28, 76, 128, 0.35);
-    background: rgba(255, 255, 255, 0.78);
-  }
-
-  .contact-link:active {
-    transform: translateY(1px);
-  }
-
-  .contact-link svg {
-    width: 0.88rem;
-    height: 0.88rem;
-    fill: none;
-    stroke: currentColor;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-width: 1.55;
-  }
-
-  .plan-team.is-winner {
-    background: rgba(246, 241, 233, 0.98);
-    font-weight: 600;
-  }
-
-  .plan-divider {
-    border-top: 1px solid rgba(26, 31, 46, 0.08);
-  }
-
-  .is-bye .plan-team:last-child {
-    color: var(--color-court-red);
-    font-family: var(--font-mono);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  .phone-dialog {
-    position: fixed;
-    top: 50%;
-    right: auto;
-    bottom: auto;
-    left: 50%;
-    width: min(calc(100dvw - 2rem), 24rem);
-    max-height: min(calc(100dvh - 2rem), 760px);
-    margin: 0;
-    opacity: 0;
-    transform: translate(-50%, calc(-50% + 18px)) scale(0.96);
-    transition:
-      opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1),
-      transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: opacity, transform;
-  }
-
-  .phone-dialog.is-open {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-
-  .phone-dialog.is-closing {
-    opacity: 0;
-    transform: translate(-50%, calc(-50% + 10px)) scale(0.98);
-  }
-
-  .phone-dialog::backdrop {
-    opacity: 0;
-    backdrop-filter: blur(3px);
-    transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  .phone-dialog.is-open::backdrop {
-    opacity: 1;
-  }
-
-  .phone-dialog.is-closing::backdrop {
-    opacity: 0;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .phone-dialog,
-    .phone-dialog::backdrop {
-      transition: none;
-      will-change: auto;
-    }
-  }
-
-  .phone-dialog-panel {
-    display: grid;
-    gap: 1rem;
-    padding: 1.1rem;
-  }
-
-  .phone-dialog-number {
-    border: 1px solid rgba(26, 31, 46, 0.1);
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.52);
-    padding: 0.85rem;
-    font-family: var(--font-mono);
-    font-size: 1.05rem;
-    color: var(--color-deep-ink);
-  }
-
-  .phone-dialog-close {
-    cursor: pointer;
-    display: grid;
-    width: 34px;
-    height: 34px;
-    flex: 0 0 auto;
-    place-items: center;
-    border: 1px solid rgba(26, 31, 46, 0.14);
-    border-radius: 4px;
-    color: var(--color-deep-ink);
-    background: transparent;
-    font-size: 24px;
-    line-height: 1;
-    transition: transform 0.18s ease, border-color 0.18s ease;
-  }
-
-  .phone-dialog-close:hover {
-    border-color: var(--color-deep-ink);
-  }
-
-  .phone-dialog-close:active {
-    transform: translateY(1px);
-  }
-</style>
-
-<dialog class="phone-dialog rounded-sm border border-deep-ink/15 bg-warm-sand p-0 text-deep-ink shadow-[0_24px_70px_-36px_rgba(26,31,46,0.45)] backdrop:bg-deep-ink/45" data-phone-dialog>
-  <div class="border-b border-deep-ink/10 px-4 py-4">
-    <div class="flex items-start justify-between gap-4">
-      <div>
-        <div class="label-mono text-club-blue">Kontakt</div>
-        <h2 class="mt-1 font-serif text-2xl leading-tight" data-phone-dialog-name></h2>
-      </div>
-      <button type="button" class="phone-dialog-close" data-phone-close aria-label="Telefonnummer schliessen">
-        <span aria-hidden="true">×</span>
-      </button>
     </div>
   </div>
-  <div class="phone-dialog-panel">
-    <div class="phone-dialog-number" data-phone-dialog-number></div>
-  </div>
-</dialog>
-
-<script>
-  document.querySelectorAll('[data-phone-dialog]').forEach((dialogEl) => {
-    const dialog = dialogEl;
-    const section = dialog.closest('section, div');
-    const closeButton = section?.querySelector('[data-phone-close]');
-    const nameTarget = section?.querySelector('[data-phone-dialog-name]');
-    const numberTarget = section?.querySelector('[data-phone-dialog-number]');
-    if (!(dialog instanceof HTMLDialogElement) || !nameTarget || !numberTarget) return;
-
-    function openDialog() {
-      if (!dialog.open) {
-        dialog.showModal();
-        requestAnimationFrame(() => dialog.classList.add('is-open'));
-      }
-    }
-
-    function closeDialog() {
-      if (!dialog.open || dialog.classList.contains('is-closing')) return;
-      dialog.classList.remove('is-open');
-      dialog.classList.add('is-closing');
-      window.setTimeout(() => {
-        dialog.close();
-        dialog.classList.remove('is-closing');
-      }, 220);
-    }
-
-    section?.querySelectorAll('[data-phone-open]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const name = button.getAttribute('data-phone-name') ?? '';
-        const number = button.getAttribute('data-phone-number') ?? '';
-        nameTarget.textContent = name;
-        numberTarget.textContent = number;
-        openDialog();
-      });
-    });
-
-    closeButton?.addEventListener('click', closeDialog);
-    dialog.addEventListener('click', (event) => {
-      if (event.target === dialog) closeDialog();
-    });
-    dialog.addEventListener('cancel', (event) => {
-      event.preventDefault();
-      closeDialog();
-    });
-  });
-</script>
+</div>

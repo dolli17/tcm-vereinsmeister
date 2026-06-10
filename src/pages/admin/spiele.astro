@@ -1,5 +1,5 @@
 ---
-import Layout from '../../layouts/Layout.astro';
+import AdminShell from '../../components/AdminShell.astro';
 import { getAllFixturesWithStatus, type AdminFixture } from '../../lib/matchEntry';
 
 const user = Astro.locals.user;
@@ -8,7 +8,6 @@ if (user.role !== 'admin') return Astro.redirect('/');
 
 const fixtures = getAllFixturesWithStatus();
 
-// Nach Konkurrenz + (Gruppe/Runde) gruppieren, Reihenfolge wie in den Fixtures.
 const sections: { key: string; items: AdminFixture[] }[] = [];
 for (const f of fixtures) {
   const sub = f.gruppe != null ? `Gruppe ${f.gruppe}` : (f.runde ?? '');
@@ -26,73 +25,70 @@ const err = params.get('error');
 const errMsg = err === 'score' ? 'Ungültiges Ergebnis (z. B. 6:3 / 6:4, bei 1:1 ein Match-Tiebreak).' : err === 'fixture' ? 'Spiel nicht gefunden.' : err ? 'Aktion fehlgeschlagen.' : null;
 
 const statusText: Record<AdminFixture['status'], string> = { open: 'offen', pending: 'wartet', confirmed: 'bestätigt', rejected: 'abgelehnt' };
+const statusPill: Record<AdminFixture['status'], string> = { open: 'wait', pending: 'wait', confirmed: 'ok', rejected: 'blocked' };
 ---
 
-<Layout title="Spiele verwalten · Admin">
-  <div class="border-b border-deep-ink/10 bg-warm-sand-2/40">
-    <div class="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-2">
-      <a href="/admin" class="auth-nav-link">← Admin</a>
-      <form method="POST" action="/api/auth/logout"><button type="submit" class="auth-nav-link">Abmelden</button></form>
-    </div>
+<AdminShell title="Spiele & Ergebnisse · Admin" active="spiele">
+  <h1 class="admin-h1">Spiele &amp; Ergebnisse</h1>
+  <p style="color:var(--muted);margin-bottom:16px">Ergebnis für jedes Spiel direkt eintragen, korrigieren oder löschen. Admin-Einträge gelten sofort als bestätigt.</p>
+
+  {okMsg && <div class="notice ok">{okMsg}</div>}
+  {errMsg && <div class="notice err">{errMsg}</div>}
+
+  <div class="admin-grid">
+    {sections.map((sec) => (
+      <div class="panel">
+        <h2>{sec.key} <span class="ct">{sec.items.filter((m) => m.status === 'confirmed').length}/{sec.items.length}</span></h2>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          {sec.items.map((m) => (
+            <form method="POST" action="/api/admin/enter" class="row-item" style="gap:8px">
+              <input type="hidden" name="match_id" value={m.matchId} />
+              <div class="grow">
+                <div style="font-size:.92rem">
+                  <span style="font-family:var(--font-mono);font-size:.72rem;color:var(--muted)">{String(m.nr).padStart(2, '0')}</span>
+                  {' '}{m.sideA.join(' / ')} <span style="color:var(--muted)">vs</span> {m.sideB.join(' / ')}
+                </div>
+                <div style="font-size:.74rem;color:var(--muted)"><span class={`pill ${statusPill[m.status]}`}>{statusText[m.status]}</span>{m.result ? ` ${m.result}` : ''}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap" data-entry>
+                <select class="input" name="ergebnis_typ" style="min-height:34px;width:7.5rem" aria-label="Ergebnistyp" data-typ>
+                  <option value="gespielt" selected={m.ergebnisTyp === 'gespielt'}>Gespielt</option>
+                  <option value="wo" selected={m.ergebnisTyp === 'wo'}>Kampflos</option>
+                  <option value="aufgabe" selected={m.ergebnisTyp === 'aufgabe'}>Aufgabe</option>
+                </select>
+                <span data-sets style="display:flex;gap:6px;align-items:center">
+                  <input class="score-in" name="satz1" value={m.satz1 ?? ''} placeholder="6:3" aria-label="Satz 1" />
+                  <input class="score-in" name="satz2" value={m.satz2 ?? ''} placeholder="6:4" aria-label="Satz 2" />
+                  <input class="score-in" name="mtb" value={m.mtb ?? ''} placeholder="MTB" aria-label="Match-Tiebreak" />
+                </span>
+                <select class="input" name="sieger" style="min-height:34px;max-width:9rem;display:none" aria-label="Sieger" data-winner>
+                  <option value="A" selected={m.sieger === 'A'}>{m.sideA.join(' / ')}</option>
+                  <option value="B" selected={m.sieger === 'B'}>{m.sideB.join(' / ')}</option>
+                </select>
+                <button type="submit" name="action" value="save" class="btn sm">Speichern</button>
+                {m.status !== 'open' && (
+                  <button type="submit" name="action" value="delete" class="btn sm ghost" formnovalidate aria-label="Löschen">✕</button>
+                )}
+              </div>
+            </form>
+          ))}
+        </div>
+      </div>
+    ))}
   </div>
+</AdminShell>
 
-  <main class="mx-auto max-w-4xl px-4 py-8">
-    <div class="label-mono text-club-blue">Admin</div>
-    <h1 class="mt-1 font-serif text-4xl leading-tight text-deep-ink">Spiele verwalten</h1>
-    <p class="mt-2 text-[15px] text-muted">Ergebnis für jedes Spiel direkt eintragen, korrigieren oder löschen. Admin-Einträge gelten sofort als bestätigt.</p>
-
-    {okMsg && <div class="mt-5 rounded-sm border border-club-blue/30 bg-club-blue/5 px-4 py-3 text-[15px] text-deep-ink">{okMsg}</div>}
-    {errMsg && <div class="mt-5 rounded-sm border border-court-red/30 bg-court-red/5 px-4 py-3 text-[15px] text-deep-ink">{errMsg}</div>}
-
-    <div class="mt-6 space-y-7">
-      {sections.map((sec) => (
-        <section>
-          <h2 class="label-mono mb-2 text-court-red">{sec.key}</h2>
-          <div class="grid gap-1.5">
-            {sec.items.map((m) => (
-              <form method="POST" action="/api/admin/enter" class="grid grid-cols-1 items-center gap-2 rounded-sm border border-deep-ink/12 bg-white/55 p-2.5 sm:grid-cols-[1fr_auto]">
-                <input type="hidden" name="wettbewerb" value={m.wettbewerb} />
-                {m.gruppe != null && <input type="hidden" name="gruppe" value={m.gruppe} />}
-                {m.runde && <input type="hidden" name="runde" value={m.runde} />}
-                <input type="hidden" name="match_nr" value={m.nr} />
-                <div class="min-w-0">
-                  <div class="truncate text-[15px] text-deep-ink">
-                    <span class="font-mono text-[11px] text-muted-2">{String(m.nr).padStart(2, '0')}</span>
-                    {' '}{m.sideA.join(' / ')} <span class="text-muted-2">vs</span> {m.sideB.join(' / ')}
-                  </div>
-                  <div class="mt-0.5 text-[12px] text-muted-2">
-                    Status: {statusText[m.status]}{m.result ? ` · ${m.result}` : ''}
-                  </div>
-                </div>
-                <div class="flex items-center gap-1.5">
-                  <input class="adm-score" name="satz1" value={m.satz1 ?? ''} placeholder="6:3" aria-label="Satz 1" />
-                  <input class="adm-score" name="satz2" value={m.satz2 ?? ''} placeholder="6:4" aria-label="Satz 2" />
-                  <input class="adm-score" name="mtb" value={m.mtb ?? ''} placeholder="MTB" aria-label="Match-Tiebreak" />
-                  <button type="submit" name="action" value="save" class="adm-btn save">Speichern</button>
-                  {m.status !== 'open' && (
-                    <button type="submit" name="action" value="delete" class="adm-btn del" formnovalidate>✕</button>
-                  )}
-                </div>
-              </form>
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
-  </main>
-
-  <style>
-    .auth-nav-link { cursor: pointer; background: transparent; border: none; font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: 1.1px; text-transform: uppercase; color: var(--color-muted); }
-    .auth-nav-link:hover { color: var(--color-deep-ink); }
-    .adm-score {
-      width: 3.6rem; min-height: 38px; border: 1px solid rgba(26,31,46,0.18); border-radius: 6px;
-      padding: 0.3rem 0.4rem; font: inherit; font-family: var(--font-mono); font-size: 13px;
-      background: rgba(255,255,255,0.85); outline: none; text-align: center;
-    }
-    .adm-score:focus { border-color: var(--color-deep-ink); }
-    .adm-btn { cursor: pointer; min-height: 38px; border-radius: 6px; padding: 0 0.7rem; border: 1px solid transparent; color: #fff; font-family: var(--font-mono); font-size: 10px; font-weight: 500; letter-spacing: 0.6px; text-transform: uppercase; }
-    .adm-btn.save { background: var(--color-deep-ink); border-color: var(--color-deep-ink); }
-    .adm-btn.del { background: transparent; border-color: rgba(179,64,47,0.5); color: var(--color-court-red); }
-    .adm-btn:active { transform: translateY(1px); }
-  </style>
-</Layout>
+<script>
+  // Ergebnistyp-Umschalter: Kampflos blendet Sätze aus, Sonderfälle brauchen den Sieger.
+  document.querySelectorAll<HTMLElement>('[data-entry]').forEach((wrap) => {
+    const typ = wrap.querySelector<HTMLSelectElement>('[data-typ]');
+    if (!typ) return;
+    const apply = () => {
+      const t = typ.value;
+      wrap.querySelectorAll<HTMLElement>('[data-sets]').forEach((el) => { el.style.display = t === 'wo' ? 'none' : 'flex'; });
+      wrap.querySelectorAll<HTMLElement>('[data-winner]').forEach((el) => { el.style.display = t === 'gespielt' ? 'none' : ''; });
+    };
+    typ.addEventListener('change', apply);
+    apply();
+  });
+</script>

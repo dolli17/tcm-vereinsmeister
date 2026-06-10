@@ -1,0 +1,133 @@
+---
+import AppShell from '../components/AppShell.astro';
+import { hasCasualAccess } from '../lib/auth';
+import { getActiveSeason, listSeasons } from '../lib/tournament';
+import { getAllPlayerNames } from '../lib/playerStats';
+import { headToHead, listCasualMatches } from '../lib/casual';
+
+// Doppelte Absicherung zur Middleware.
+if (!hasCasualAccess(Astro.locals.user)) return Astro.redirect('/');
+
+const season = getActiveSeason();
+const seasons = listSeasons();
+const names = getAllPlayerNames();
+const params = Astro.url.searchParams;
+const a = (params.get('a') ?? '').trim();
+const b = (params.get('b') ?? '').trim();
+const h2h = a && b && a.toLowerCase() !== b.toLowerCase() ? headToHead(a, b) : null;
+const recent = listCasualMatches(100);
+
+const ok = params.get('ok');
+const okMsg: Record<string, string> = { added: 'Duell gespeichert.', deleted: 'Duell gelöscht.' };
+const err = params.get('error');
+const errMsg: Record<string, string> = {
+  names: 'Bitte beide Personen mit gültigem Namen angeben.',
+  same: 'Bitte zwei verschiedene Personen wählen.',
+  score: 'Ergebnis ungültig — mind. ein Satz (z. B. 6:3), eindeutiger Sieger.',
+  notowner: 'Nur der Ersteller (oder Admin) kann ein Duell löschen.',
+  input: 'Aktion fehlgeschlagen.',
+};
+const initials = (n: string) => n.split(' ').filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+---
+
+<AppShell active="casual" season={season} seasons={seasons} title="Casual · Head-to-Head">
+  <div class="section-title">Casual &amp; Head-to-Head</div>
+  <div class="section-sub">Lockere Duelle außerhalb der Vereinsmeisterschaft — inklusive der bestätigten VM-Duelle.</div>
+
+  <div class="section">
+    {ok && okMsg[ok] && <div class="notice ok">{okMsg[ok]}</div>}
+    {err && errMsg[err] && <div class="notice err">{errMsg[err]}</div>}
+
+    <datalist id="casual-spieler">{names.map((n) => <option value={n} />)}</datalist>
+
+    <!-- Head-to-Head -->
+    <div class="card" style="padding:16px">
+      <h2 class="section-title" style="padding:0 0 10px;font-size:1.3rem">Head-to-Head</h2>
+      <form method="GET" style="display:grid;gap:10px">
+        <label class="field" style="margin:0"><span class="lbl">Person A</span><input class="input" name="a" list="casual-spieler" value={a} placeholder="Name" autocomplete="off" /></label>
+        <label class="field" style="margin:0"><span class="lbl">Person B</span><input class="input" name="b" list="casual-spieler" value={b} placeholder="Name" autocomplete="off" /></label>
+        <button class="btn block">Vergleichen</button>
+      </form>
+
+      {h2h && (
+        <div style="margin-top:16px;border-top:1px solid var(--line);padding-top:16px">
+          <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;text-align:center">
+            <div class="brand-title" style="font-size:1.05rem">{h2h.a}</div>
+            <div style="font-family:var(--font-mono);font-weight:700;font-size:1.9rem">{h2h.aWins} : {h2h.bWins}</div>
+            <div class="brand-title" style="font-size:1.05rem">{h2h.b}</div>
+          </div>
+          <div style="text-align:center;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:4px">{h2h.total} Duelle</div>
+
+          {h2h.duels.length === 0 ? (
+            <p class="section-sub" style="text-align:center;padding:12px 0 0">Noch keine Duelle erfasst.</p>
+          ) : (
+            <div class="matchlist" style="margin-top:12px">
+              {h2h.duels.map((d) => (
+                <div class="match">
+                  <div class="match-body">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span class={`status-tag ${d.kind === 'VM' ? 'open' : 'done'}`}>{d.kind}</span>
+                      <span style="font-size:.74rem;color:var(--muted)">{d.context}{d.datum ? ` · ${d.datum}` : ''}</span>
+                    </div>
+                  </div>
+                  <div class="match-meta">
+                    {d.result && <span class="score">{d.result}</span>}
+                    <span style="font-size:.72rem;color:var(--muted)">Sieger: {d.winner}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+
+    <!-- Duell erfassen -->
+    <div class="card" style="padding:16px;margin-top:14px">
+      <h2 class="section-title" style="padding:0 0 10px;font-size:1.3rem">Duell erfassen</h2>
+      <form method="POST" action="/api/casual/match" style="display:grid;gap:10px">
+        <input type="hidden" name="action" value="add" />
+        <div style="display:grid;gap:10px;grid-template-columns:1fr 1fr">
+          <label class="field" style="margin:0"><span class="lbl">Person A</span><input class="input" name="player_a" list="casual-spieler" required placeholder="Name" autocomplete="off" /></label>
+          <label class="field" style="margin:0"><span class="lbl">Person B</span><input class="input" name="player_b" list="casual-spieler" required placeholder="Name" autocomplete="off" /></label>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+          <label class="field" style="margin:0"><span class="lbl">Datum</span><input class="input" style="min-width:9rem" type="date" name="datum" /></label>
+          <label class="field" style="margin:0"><span class="lbl">Satz 1</span><input class="score-in" name="satz1" required placeholder="6:3" /></label>
+          <label class="field" style="margin:0"><span class="lbl">Satz 2</span><input class="score-in" name="satz2" placeholder="4:6" /></label>
+          <label class="field" style="margin:0"><span class="lbl">MTB</span><input class="score-in" name="mtb" placeholder="10:7" /></label>
+        </div>
+        <label class="field" style="margin:0"><span class="lbl">Notiz (optional)</span><input class="input" name="notiz" placeholder="z. B. Sandplatz, Abend" /></label>
+        <button class="btn">Duell speichern</button>
+        <p class="section-sub" style="padding:0">Sieger wird aus den Sätzen ermittelt. Person A steht links (Satz aus A-Sicht: 6:3 = A führt).</p>
+      </form>
+    </div>
+
+    <!-- Erfasste Duelle -->
+    <h2 class="section-title" style="padding:14px 0 6px;font-size:1.3rem">Erfasste Duelle <span style="color:var(--muted)">({recent.length})</span></h2>
+    {recent.length === 0 ? (
+      <div class="empty"><div class="t">Noch keine Casual-Duelle</div><div class="d">Erfasse oben das erste Duell.</div></div>
+    ) : (
+      <div style="display:flex;flex-direction:column;gap:8px">
+        {recent.map((m) => (
+          <div class="card" style="display:flex;align-items:center;gap:10px;padding:10px 12px">
+            <span class="avatar" style="width:30px;height:30px;font-size:.72rem">{initials(m.sieger === 'A' ? m.player_a : m.player_b)}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;font-size:.92rem">{m.player_a} <span style="color:var(--muted)">vs</span> {m.player_b}</div>
+              <div style="font-size:.74rem;color:var(--muted)">
+                <span style="font-family:var(--font-mono)">{[m.satz1, m.satz2, m.mtb].filter(Boolean).join(' · ')}</span> · Sieger: {m.sieger === 'A' ? m.player_a : m.player_b}{m.datum ? ` · ${m.datum}` : ''}
+              </div>
+            </div>
+            {(Astro.locals.user?.role === 'admin' || m.created_by === Astro.locals.user?.id) && (
+              <form method="POST" action="/api/casual/match">
+                <input type="hidden" name="action" value="delete" />
+                <input type="hidden" name="id" value={m.id} />
+                <button class="btn sm danger" type="submit">Löschen</button>
+              </form>
+            )}
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+</AppShell>

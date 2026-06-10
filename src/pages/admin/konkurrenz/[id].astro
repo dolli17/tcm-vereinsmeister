@@ -1,0 +1,174 @@
+---
+import AdminShell from '../../../components/AdminShell.astro';
+import { getCompetition, getCompetitionPlayers, getMatchRows, MONTH_ORDER } from '../../../lib/tournament';
+import { getAllPlayerNames } from '../../../lib/playerStats';
+import { listRegistrations } from '../../../lib/registrations';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+if (user.role !== 'admin') return Astro.redirect('/');
+
+const id = parseInt(Astro.params.id ?? '', 10);
+const comp = Number.isNaN(id) ? null : getCompetition(id);
+if (!comp) return Astro.redirect('/admin/saison');
+
+const players = getCompetitionPlayers(comp.id);
+const matches = getMatchRows(comp.id);
+const alleNamen = getAllPlayerNames();
+const regs = listRegistrations(comp.id);
+const playerNames = new Set(players.map((p) => p.player_name));
+const offeneMeldungen = regs.filter((r) => !playerNames.has(r.player_name));
+
+const ok = Astro.url.searchParams.get('ok');
+const genN = Astro.url.searchParams.get('n');
+const okMsg: Record<string, string> = {
+  player: 'Teilnehmer gespeichert.', playerdel: 'Teilnehmer entfernt.',
+  match: 'Paarung gespeichert.', matchdel: 'Paarung gelöscht.', comp: 'Konkurrenz aktualisiert.',
+  generated: `Spielplan erzeugt${genN ? ` — ${genN} neue Paarung(en)` : ''}.`,
+  adopted: `Meldungen übernommen${genN ? ` — ${genN} neue Teilnehmer` : ''}.`,
+};
+const err = Astro.url.searchParams.get('error');
+const errMsg: Record<string, string> = {
+  nomodus: 'Dieser Generator passt nicht zum Modus der Konkurrenz.',
+  koexists: 'Es existieren bereits Paarungen — bitte erst alle löschen, dann neu erzeugen.',
+  koplayers: 'Für ein KO-Bracket braucht es mindestens 2 Teilnehmer.',
+};
+const isGruppe = comp.modus === 'gruppe';
+---
+
+<AdminShell title={`${comp.name} · Admin`} active="saison">
+  <p style="margin-bottom:4px"><a href={`/admin/saison?season=${comp.season_id}`} style="color:var(--muted);font-weight:600;text-decoration:none">← Saison</a></p>
+  <h1 class="admin-h1">{comp.name}</h1>
+  <p style="color:var(--muted);margin-bottom:16px">Konkurrenz · {isGruppe ? 'Gruppen' : 'KO'}</p>
+
+  {ok && okMsg[ok] && <div class="notice ok">{okMsg[ok]}</div>}
+  {err && <div class="notice err">{errMsg[err] ?? 'Eingabe unvollständig oder ungültig.'}</div>}
+
+  <datalist id="alle-spieler">{alleNamen.map((n) => <option value={n} />)}</datalist>
+
+  <div class="panel" style="margin-bottom:16px">
+    <form method="POST" action="/api/admin/competition" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      <input type="hidden" name="action" value="comp_update" />
+      <input type="hidden" name="competition_id" value={comp.id} />
+      <label class="field" style="margin:0;flex:1;min-width:200px"><span class="lbl">Name</span><input class="input" name="name" value={comp.name} /></label>
+      <label class="field" style="margin:0"><span class="lbl">Modus</span><select class="input" name="modus"><option value="gruppe" selected={comp.modus === 'gruppe'}>Gruppen</option><option value="ko" selected={comp.modus === 'ko'}>KO</option></select></label>
+      <button class="btn">Speichern</button>
+    </form>
+  </div>
+
+  <div class="admin-cols">
+    <!-- Paarungen (größere Spalte) -->
+    <div class="panel">
+      <h2>Paarungen <span class="ct">{matches.length}</span></h2>
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:10px">Seite als „Name" (Einzel) bzw. „Name1 / Name2" (Doppel). Freilos = <code>BYE</code>.</p>
+
+      {isGruppe && (
+        <form method="POST" action="/api/admin/match" style="margin-bottom:12px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap" onsubmit="return confirm('Fehlende Jeder-gegen-Jeden-Paarungen für alle Gruppen erzeugen? Bestehende bleiben erhalten.')">
+          <input type="hidden" name="action" value="match_generate" />
+          <input type="hidden" name="competition_id" value={comp.id} />
+          <label class="field" style="margin:0"><span class="lbl">Fällig im Monat</span>
+            <select class="input" name="monat" style="min-height:38px">
+              <option value="">— offen —</option>
+              {MONTH_ORDER.map((mo) => <option value={mo}>{mo}</option>)}
+            </select>
+          </label>
+          <button class="btn lime">⚙ Spielplan generieren (Jeder gegen Jeden)</button>
+        </form>
+      )}
+
+      {!isGruppe && matches.length === 0 && (
+        <form method="POST" action="/api/admin/match" style="margin-bottom:12px" onsubmit="return confirm('KO-Bracket aus den Teilnehmern erzeugen? Gesetzte Spieler werden als Setzliste verteilt, der Rest gelost.')">
+          <input type="hidden" name="action" value="ko_generate" />
+          <input type="hidden" name="competition_id" value={comp.id} />
+          <button class="btn lime">⚙ KO-Bracket erzeugen ({players.length} Teilnehmer)</button>
+          <p style="font-size:.76rem;color:var(--muted);margin-top:6px">Sieger rücken nach bestätigtem Ergebnis automatisch in die nächste Runde vor.</p>
+        </form>
+      )}
+
+      <div style="display:flex;flex-direction:column;gap:6px">
+        {matches.map((m) => (
+          <form method="POST" action="/api/admin/match" class="row-item" style="gap:6px;flex-wrap:nowrap">
+            <input type="hidden" name="match_id" value={m.id} />
+            <input class="score-in" style="width:3rem" name="nr" type="number" value={m.nr} aria-label="Nr" />
+            {isGruppe
+              ? <input class="score-in" style="width:3.4rem" name="gruppe" type="number" value={m.gruppe ?? ''} placeholder="Gr." aria-label="Gruppe" />
+              : <input class="input" style="min-height:38px;width:6.5rem" name="runde" value={m.runde ?? ''} placeholder="Runde" aria-label="Runde" />}
+            <input class="input" style="min-height:38px;flex:1;min-width:90px" name="side_a" list="alle-spieler" value={m.side_a ?? ''} placeholder="Seite A" />
+            <input class="input" style="min-height:38px;flex:1;min-width:90px" name="side_b" list="alle-spieler" value={m.side_b ?? ''} placeholder="Seite B" />
+            <select class="input" style="min-height:38px;width:6rem" name="monat" aria-label="Monat">
+              <option value="">Monat?</option>
+              {MONTH_ORDER.map((mo) => <option value={mo} selected={m.monat === mo}>{mo}</option>)}
+            </select>
+            <input type="hidden" name="termin" value={m.termin ?? ''} />
+            <button class="btn sm" type="submit" name="action" value="match_update" aria-label="Speichern">✓</button>
+            <button class="btn sm ghost" type="submit" name="action" value="match_delete" formnovalidate aria-label="Löschen" onclick="return confirm('Paarung samt Ergebnis löschen?')">✕</button>
+          </form>
+        ))}
+      </div>
+
+      <form method="POST" action="/api/admin/match" class="row-item" style="gap:6px;flex-wrap:nowrap;border-style:dashed;margin-top:10px">
+        <input type="hidden" name="action" value="match_create" />
+        <input type="hidden" name="competition_id" value={comp.id} />
+        <input class="score-in" style="width:3rem" name="nr" type="number" placeholder="Nr" aria-label="Nr" />
+        {isGruppe
+          ? <input class="score-in" style="width:3.4rem" name="gruppe" type="number" placeholder="Gr." aria-label="Gruppe" />
+          : <input class="input" style="min-height:38px;width:6.5rem" name="runde" placeholder="Runde" aria-label="Runde" />}
+        <input class="input" style="min-height:38px;flex:1;min-width:90px" name="side_a" list="alle-spieler" placeholder="Seite A" />
+        <input class="input" style="min-height:38px;flex:1;min-width:90px" name="side_b" list="alle-spieler" placeholder="Seite B" />
+        <select class="input" style="min-height:38px;width:6rem" name="monat" aria-label="Monat">
+          <option value="">Monat?</option>
+          {MONTH_ORDER.map((mo) => <option value={mo}>{mo}</option>)}
+        </select>
+        <button class="btn sm" type="submit">+</button>
+      </form>
+    </div>
+
+    <!-- Teilnehmer -->
+    <div class="panel">
+      {regs.length > 0 && (
+        <div style="border:1px dashed var(--line);border-radius:8px;padding:10px 12px;margin-bottom:14px">
+          <div style="font-weight:600;margin-bottom:6px">Meldungen <span class="ct">{regs.length}</span> {offeneMeldungen.length > 0 && <span class="pill wait">{offeneMeldungen.length} offen</span>}</div>
+          <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px">
+            {regs.map((r) => (
+              <div style="font-size:.82rem">
+                {r.player_name}
+                {r.notiz && <span style="color:var(--muted)"> · Wunschpartner: {r.notiz}</span>}
+                {playerNames.has(r.player_name) && <span class="pill ok"> übernommen</span>}
+              </div>
+            ))}
+          </div>
+          {offeneMeldungen.length > 0 && (
+            <form method="POST" action="/api/admin/competition">
+              <input type="hidden" name="action" value="meldungen_uebernehmen" />
+              <input type="hidden" name="competition_id" value={comp.id} />
+              <button class="btn sm lime">Alle Meldungen als Teilnehmer übernehmen</button>
+            </form>
+          )}
+        </div>
+      )}
+      <h2>Teilnehmer <span class="ct">{players.length}</span></h2>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+        {players.map((p) => (
+          <div class="row-item" style="gap:8px">
+            <span class="grow">{p.player_name}
+              {isGruppe && p.gruppe != null && <span style="font-family:var(--font-mono);font-size:.78rem;color:var(--muted)"> · Gruppe {p.gruppe}</span>}
+              {p.gesetzt && <span class="pill ok"> gesetzt</span>}
+            </span>
+            <form method="POST" action="/api/admin/competition"><input type="hidden" name="action" value="player_remove" /><input type="hidden" name="competition_id" value={comp.id} /><input type="hidden" name="player_name" value={p.player_name} /><button class="btn sm ghost">Entfernen</button></form>
+          </div>
+        ))}
+      </div>
+
+      <form method="POST" action="/api/admin/competition" style="border-top:1px solid var(--line);padding-top:12px;display:grid;gap:10px">
+        <input type="hidden" name="action" value="player_add" />
+        <input type="hidden" name="competition_id" value={comp.id} />
+        <label class="field" style="margin:0"><span class="lbl">Spieler</span><input class="input" name="player_name" list="alle-spieler" required placeholder="Name (neu oder vorhanden)" autocomplete="off" /></label>
+        <div style="display:flex;gap:10px;align-items:flex-end">
+          <label class="field" style="margin:0;width:110px"><span class="lbl">Gruppe</span><input class="input" name="gruppe" type="number" disabled={!isGruppe} placeholder={isGruppe ? '1' : '–'} /></label>
+          <label style="display:flex;align-items:center;gap:6px;padding-bottom:10px"><input type="checkbox" name="gesetzt" /> <span style="font-size:.85rem;color:var(--muted)">gesetzt</span></label>
+        </div>
+        <button class="btn">Hinzufügen</button>
+      </form>
+    </div>
+  </div>
+</AdminShell>

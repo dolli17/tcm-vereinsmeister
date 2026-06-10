@@ -1,394 +1,86 @@
 ---
-import { computeStandings, getMatches, getSpielerOfGruppe, type Konkurrenz } from '../lib/standings';
-import MatchZeile from './MatchZeile.astro';
+import { computeStandings, formatResult } from '../lib/standings';
+import { getEnrichedMatches, isPlayed, monthIndex, type Competition } from '../lib/tournament';
 
-type Props = { gruppe: number; konkurrenz?: Konkurrenz };
-const { gruppe, konkurrenz = 'herren' } = Astro.props;
+type Props = { competition: Competition; gruppe: number; index: number };
+const { competition, gruppe, index } = Astro.props;
 
-const spieler = getSpielerOfGruppe(gruppe, konkurrenz);
-const standings = computeStandings(gruppe, konkurrenz);
-const matchesMai = getMatches(gruppe, 'Mai', konkurrenz);
-const matchesJuni = getMatches(gruppe, 'Juni', konkurrenz);
-const matchesJuli = getMatches(gruppe, 'Juli', konkurrenz);
-const gesetzt = spieler.find((s) => s.gesetzt);
-const standingRows = standings.map((row) => ({ ...row, qualifiziert: row.platz <= 2 }));
+const standings = computeStandings(competition.id, gruppe);
+const matches = getEnrichedMatches(competition.id)
+  .filter((m) => m.gruppe === gruppe)
+  .sort((a, b) => (a.monat ? monthIndex(a.monat) : 99) - (b.monat ? monthIndex(b.monat) : 99) || a.nr - b.nr);
+const played = matches.filter(isPlayed).length;
+const collapseId = `grp-${competition.id}-${gruppe}`;
+const result = formatResult;
 
+// Internationale wa.me-Nummer aus einer beliebig formatierten Telefonnummer.
 function whatsappHref(telefon: string): string {
-  const digits = telefon.replace(/\D/g, '');
-  const internationalNumber = digits.startsWith('00')
-    ? digits.slice(2)
-    : digits.startsWith('0')
-      ? `49${digits.slice(1)}`
-      : digits;
-  const text = encodeURIComponent('Hallo, ich melde mich wegen der Vereinsmeisterschaft.');
-  return `https://wa.me/${internationalNumber}?text=${text}`;
+  const d = telefon.replace(/\D/g, '');
+  const intl = d.startsWith('00') ? d.slice(2) : d.startsWith('0') ? `49${d.slice(1)}` : d;
+  return `https://wa.me/${intl}`;
 }
+const telHref = (t: string) => `tel:${t.replace(/[^\d+]/g, '')}`;
+
+const WA = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1 0 12 2zm5.8 14.2c-.2.7-1.4 1.3-2 1.4-.5.1-1.2.1-1.9-.1-.4-.1-1-.3-1.7-.6-3-1.3-4.9-4.3-5.1-4.5-.1-.2-1.2-1.6-1.2-3 0-1.4.7-2.1 1-2.4.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 1.9c.1.2.1.4 0 .5l-.4.6c-.1.1-.3.3-.1.6.1.3.6 1 1.3 1.6.9.8 1.6 1 1.9 1.2.2.1.4.1.6-.1l.7-.8c.2-.2.4-.2.6-.1l1.8.9c.2.1.4.2.5.3.1.2.1.9-.1 1.6z"/></svg>';
+const TEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7.1 4.1 8.3 6.7 7 8c.6 1.5 1.7 2.7 3.1 3.1l1.3-1.3 2.6 1.2-.2 2.2c0 .5-.4.9-.9.9-4.4-.1-8-3.7-8.1-8.1 0-.5.4-.9.9-.9l2.4-.1Z"/></svg>';
 ---
 
-<section class="overflow-hidden rounded-sm border border-deep-ink/10 bg-white/60 shadow-[0_10px_34px_-30px_rgba(26,31,46,0.55)] backdrop-blur-sm" data-gruppe={gruppe} data-konkurrenz={konkurrenz}>
-  <header class="grid gap-3 border-b border-deep-ink/10 bg-warm-sand-2/40 px-3.5 py-3.5 sm:flex sm:items-baseline sm:justify-between sm:px-6">
-    <div>
-      <div class="label-mono text-club-blue">Gruppe {gruppe}</div>
-      <div class="mt-0.5 font-mono text-[11px] text-muted-2">{spieler.length} Spieler · {matchesMai.length + matchesJuni.length + matchesJuli.length} Spiele</div>
-    </div>
-    {gesetzt && (
-      <div class="flex items-baseline justify-between gap-3 rounded-sm border border-deep-ink/10 bg-white/35 px-3 py-2 sm:block sm:border-0 sm:bg-transparent sm:p-0 sm:text-right">
-        <div class="label-mono text-muted-2">Gesetzt</div>
-        <div class="mt-0.5 font-serif text-[15px] text-deep-ink">{gesetzt.name}</div>
-      </div>
-    )}
-  </header>
-
-  {/* Tabelle */}
-  <div class="px-2 pt-3 sm:overflow-x-auto sm:px-4">
-    <table class="w-full table-fixed border-collapse text-[12px] sm:min-w-[420px] sm:table-auto sm:text-[13px]">
-      <thead>
-        <tr class="border-b border-deep-ink/15">
-          <th class="label-mono w-6 px-1 py-2 text-left text-muted-2 sm:w-7">#</th>
-          <th class="label-mono px-1.5 py-2 text-left text-muted-2 sm:px-2">Spieler</th>
-          <th class="label-mono w-8 px-1 py-2 text-center text-muted-2 sm:w-9" title="Spiele">Sp</th>
-          <th class="label-mono hidden w-9 px-1 py-2 text-center text-muted-2 min-[380px]:table-cell" title="Siege">S</th>
-          <th class="label-mono hidden w-14 px-1 py-2 text-center text-muted-2 sm:table-cell" title="Sätze">Sätze</th>
-          <th class="label-mono hidden w-14 px-1 py-2 text-center text-muted-2 md:table-cell" title="Spiele/Games">Games</th>
-          <th class="label-mono w-10 px-1 py-2 text-right text-muted-2 sm:w-9">Pkt</th>
-        </tr>
-      </thead>
-      <tbody>
-        {standingRows.map((row) => (
-          <tr class={`border-b border-deep-ink/8 last:border-b-0 ${row.qualifiziert ? 'bg-club-blue/6' : ''}`}>
-            <td class="px-1 py-2.5 font-mono text-[11px] tabular-nums text-muted-2">{row.platz}</td>
-            <td class="min-w-0 px-1.5 py-2.5 sm:px-2">
-              <span class="flex min-w-0 items-center gap-1.5">
-                <span class={`truncate ${row.qualifiziert ? 'font-semibold text-deep-ink' : 'text-deep-ink'}`}>{row.name}</span>
-                {row.telefon && (
-                  <span class="contact-actions">
-                    <a
-                      class="contact-link contact-link-whatsapp"
-                      href={whatsappHref(row.telefon)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`WhatsApp an ${row.name} öffnen`}
-                      title={`WhatsApp an ${row.name} öffnen`}
-                    >
-                      <svg aria-hidden="true" viewBox="0 0 20 20">
-                        <path d="M5.2 15.1 3 17l.7-2.8A7 7 0 1 1 5.2 15.1Z" />
-                        <path d="M7.2 6.9c.2-.4.4-.5.7-.5h.5c.2 0 .4.1.5.4l.5 1.2c.1.3 0 .5-.2.7l-.4.4c.5.9 1.2 1.6 2.1 2.1l.4-.4c.2-.2.5-.3.7-.2l1.2.5c.3.1.4.3.4.6v.5c0 .3-.2.5-.5.7-.6.3-1.3.3-2.2 0-1.8-.6-3.7-2.5-4.3-4.3-.3-.8-.3-1.5 0-2.1Z" />
-                      </svg>
-                    </a>
-                    <button
-                      class="contact-link contact-link-number"
-                      type="button"
-                      data-phone-open
-                      data-phone-name={row.name}
-                      data-phone-number={row.telefon}
-                      aria-label={`Telefonnummer von ${row.name} anzeigen`}
-                      title={`Telefonnummer von ${row.name} anzeigen`}
-                    >
-                      <svg aria-hidden="true" viewBox="0 0 20 20">
-                        <path d="M7.1 4.1 8.3 6.7 7 8c.6 1.5 1.7 2.7 3.1 3.1l1.3-1.3 2.6 1.2-.2 2.2c0 .5-.4.9-.9.9-4.4-.1-8-3.7-8.1-8.1 0-.5.4-.9.9-.9l2.4-.1Z" />
-                        <path d="M12.4 4.4h2.9v2.9" />
-                        <path d="m11.7 8 3.5-3.5" />
-                      </svg>
-                    </button>
-                  </span>
-                )}
-              </span>
-              {row.qualifiziert && (
-                <span class="mt-1 block font-mono text-[9px] uppercase tracking-[1px] text-club-blue">
-                  Achtelfinale
+<div class="card fade-in">
+  <div class="card-head">
+    <span class="grp-no">{index + 1}</span>
+    <span class="ttl">Gruppe {gruppe}</span>
+    <span class="sub">{standings.length} Spieler</span>
+  </div>
+  <table class="standings">
+    <thead><tr>
+      <th class="pos">#</th><th>Spieler</th>
+      <th class="num">Sp</th><th class="num">Sätze</th><th class="pts">Pkt</th>
+    </tr></thead>
+    <tbody>
+      {standings.map((row) => (
+        <tr data-q={row.platz <= 2 ? '1' : '0'}>
+          <td class="pos">{row.platz}</td>
+          <td class="player">
+            <span class="player-cell">
+              <span class="nm">{row.name}</span>
+              {row.platz <= 2 && <span class="q-flag">Quali</span>}
+              {row.telefon && (
+                <span class="contact">
+                  <a class="cico wa" href={whatsappHref(row.telefon)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp an ${row.name}`} set:html={WA} />
+                  <a class="cico tel" href={telHref(row.telefon)} aria-label={`${row.name} anrufen`} set:html={TEL} />
                 </span>
               )}
-            </td>
-            <td class="px-1 py-2.5 text-center font-mono tabular-nums text-deep-ink">{row.gespielt}</td>
-            <td class="hidden px-1 py-2.5 text-center font-mono tabular-nums text-deep-ink min-[380px]:table-cell">{row.siege}</td>
-            <td class="hidden px-1 py-2.5 text-center font-mono text-[12px] tabular-nums text-muted sm:table-cell">
-              {row.saetzeGewonnen}:{row.saetzeVerloren}
-            </td>
-            <td class="hidden px-1 py-2.5 text-center font-mono text-[12px] tabular-nums text-muted md:table-cell">
-              {row.spieleGewonnen}:{row.spieleVerloren}
-            </td>
-            <td class="px-1 py-2.5 text-right font-mono font-semibold tabular-nums text-deep-ink">{row.punkte}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-
-  {/* Spielplan */}
-  <details class="match-details border-t border-deep-ink/10">
-    <summary class="match-summary">
-      <span>
-        <span class="label-mono block text-court-red">Spielplan</span>
-        <span class="mt-1 block font-mono text-[11px] text-muted-2">
-          {matchesMai.length + matchesJuni.length + matchesJuli.length} Matches anzeigen
-        </span>
-      </span>
-      <span class="match-summary-mark" aria-hidden="true"></span>
-    </summary>
-
-    <div class="px-2 py-3.5 sm:px-4 sm:py-4">
-      {[
-        { name: 'Mai', list: matchesMai },
-        { name: 'Juni', list: matchesJuni },
-        { name: 'Juli', list: matchesJuli },
-      ].map((monat) => (
-        monat.list.length > 0 && (
-          <div class="mb-3 last:mb-0" data-monat={monat.name}>
-            <div class="label-mono mb-1.5 px-1 text-court-red">{monat.name}</div>
-            <div>
-              {monat.list.map((m) => <MatchZeile match={m} />)}
-            </div>
+            </span>
+          </td>
+          <td class="num dim">{row.gespielt}</td>
+          <td class="num dim">{row.saetzeGewonnen}:{row.saetzeVerloren}</td>
+          <td class="pts"><span class="v">{row.punkte}</span></td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+  <button class="card-foot" data-collapse={collapseId} aria-expanded="false">
+    Gruppen-Spielplan ansehen
+    <span style="color:var(--muted);font-family:var(--font-mono);font-size:.74rem">({played}/{matches.length})</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+  </button>
+  <div class="gcollapse" id={collapseId}>
+    <div class="matchlist">
+      {matches.map((m) => (
+        <div class="match">
+          <div class="match-no">#{m.nr}</div>
+          <div class="match-body">
+            <div class={`match-side ${m.sieger === 'A' ? 'win' : ''}`}><span class="nm">{m.sideA}</span></div>
+            <div class="match-vs">vs</div>
+            <div class={`match-side ${m.sieger === 'B' ? 'win' : ''}`}><span class="nm">{m.sideB}</span></div>
           </div>
-        )
+          <div class="match-meta">
+            {isPlayed(m)
+              ? <span class="score">{result(m)}</span>
+              : <span class="status-tag open">{m.monat ? `${m.monat} · offen` : 'offen'}</span>}
+          </div>
+        </div>
       ))}
     </div>
-  </details>
-
-  <dialog class="phone-dialog rounded-sm border border-deep-ink/15 bg-warm-sand p-0 text-deep-ink shadow-[0_24px_70px_-36px_rgba(26,31,46,0.45)] backdrop:bg-deep-ink/45" data-phone-dialog>
-    <div class="border-b border-deep-ink/10 px-4 py-4">
-      <div class="flex items-start justify-between gap-4">
-        <div>
-          <div class="label-mono text-club-blue">Kontakt</div>
-          <h2 class="mt-1 font-serif text-2xl leading-tight" data-phone-dialog-name></h2>
-        </div>
-        <button type="button" class="phone-dialog-close" data-phone-close aria-label="Telefonnummer schliessen">
-          <span aria-hidden="true">×</span>
-        </button>
-      </div>
-    </div>
-    <div class="phone-dialog-panel">
-      <div class="phone-dialog-number" data-phone-dialog-number></div>
-    </div>
-  </dialog>
-</section>
-
-<script>
-  document.querySelectorAll('[data-gruppe]').forEach((section) => {
-    const dialog = section.querySelector('[data-phone-dialog]');
-    const closeButton = section.querySelector('[data-phone-close]');
-    const nameTarget = section.querySelector('[data-phone-dialog-name]');
-    const numberTarget = section.querySelector('[data-phone-dialog-number]');
-    if (!(dialog instanceof HTMLDialogElement) || !nameTarget || !numberTarget) return;
-
-    function openDialog() {
-      if (!dialog.open) {
-        dialog.showModal();
-        requestAnimationFrame(() => dialog.classList.add('is-open'));
-      }
-    }
-
-    function closeDialog() {
-      if (!dialog.open || dialog.classList.contains('is-closing')) return;
-
-      dialog.classList.remove('is-open');
-      dialog.classList.add('is-closing');
-      window.setTimeout(() => {
-        dialog.close();
-        dialog.classList.remove('is-closing');
-      }, 220);
-    }
-
-    section.querySelectorAll('[data-phone-open]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const name = button.getAttribute('data-phone-name') ?? '';
-        const number = button.getAttribute('data-phone-number') ?? '';
-        nameTarget.textContent = name;
-        numberTarget.textContent = number;
-        openDialog();
-      });
-    });
-
-    closeButton?.addEventListener('click', closeDialog);
-    dialog.addEventListener('click', (event) => {
-      if (event.target === dialog) closeDialog();
-    });
-    dialog.addEventListener('cancel', (event) => {
-      event.preventDefault();
-      closeDialog();
-    });
-  });
-</script>
-
-<style>
-  .match-summary {
-    cursor: pointer;
-    display: flex;
-    min-height: 56px;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.8rem 0.9rem;
-    list-style: none;
-  }
-
-  .contact-actions {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    gap: 0.25rem;
-  }
-
-  .contact-link {
-    display: inline-flex;
-    width: 1.35rem;
-    height: 1.35rem;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid rgba(26, 31, 46, 0.14);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.52);
-    text-decoration: none;
-    transition:
-      background-color 0.16s ease,
-      border-color 0.16s ease,
-      transform 0.16s ease;
-  }
-
-  .contact-link-whatsapp {
-    color: #1f7a4d;
-  }
-
-  .contact-link-number {
-    color: var(--color-club-blue);
-    cursor: pointer;
-  }
-
-  .contact-link:hover {
-    border-color: rgba(28, 76, 128, 0.35);
-    background: rgba(255, 255, 255, 0.78);
-  }
-
-  .contact-link:active {
-    transform: translateY(1px);
-  }
-
-  .contact-link svg {
-    width: 0.88rem;
-    height: 0.88rem;
-    fill: none;
-    stroke: currentColor;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-width: 1.55;
-  }
-
-  .phone-dialog {
-    position: fixed;
-    top: 50%;
-    right: auto;
-    bottom: auto;
-    left: 50%;
-    width: min(calc(100dvw - 2rem), 24rem);
-    max-height: min(calc(100dvh - 2rem), 760px);
-    margin: 0;
-    opacity: 0;
-    transform: translate(-50%, calc(-50% + 18px)) scale(0.96);
-    transition:
-      opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1),
-      transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: opacity, transform;
-  }
-
-  .phone-dialog.is-open {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-
-  .phone-dialog.is-closing {
-    opacity: 0;
-    transform: translate(-50%, calc(-50% + 10px)) scale(0.98);
-  }
-
-  .phone-dialog::backdrop {
-    opacity: 0;
-    backdrop-filter: blur(3px);
-    transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  .phone-dialog.is-open::backdrop {
-    opacity: 1;
-  }
-
-  .phone-dialog.is-closing::backdrop {
-    opacity: 0;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .phone-dialog,
-    .phone-dialog::backdrop {
-      transition: none;
-      will-change: auto;
-    }
-  }
-
-  .phone-dialog-panel {
-    display: grid;
-    gap: 1rem;
-    padding: 1.1rem;
-  }
-
-  .phone-dialog-number {
-    border: 1px solid rgba(26, 31, 46, 0.1);
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.52);
-    padding: 0.85rem;
-    font-family: var(--font-mono);
-    font-size: 1.05rem;
-    color: var(--color-deep-ink);
-  }
-
-  .phone-dialog-close {
-    cursor: pointer;
-    display: grid;
-    width: 34px;
-    height: 34px;
-    flex: 0 0 auto;
-    place-items: center;
-    border: 1px solid rgba(26, 31, 46, 0.14);
-    border-radius: 4px;
-    color: var(--color-deep-ink);
-    background: transparent;
-    font-size: 24px;
-    line-height: 1;
-    transition: transform 0.18s ease, border-color 0.18s ease;
-  }
-
-  .phone-dialog-close:hover {
-    border-color: var(--color-deep-ink);
-  }
-
-  .phone-dialog-close:active {
-    transform: translateY(1px);
-  }
-  .match-summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .match-summary-mark {
-    position: relative;
-    width: 30px;
-    height: 30px;
-    flex: 0 0 auto;
-    border: 1px solid rgba(26, 31, 46, 0.16);
-    border-radius: 999px;
-  }
-  .match-summary-mark::before,
-  .match-summary-mark::after {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 12px;
-    height: 1px;
-    background: var(--color-deep-ink);
-    content: "";
-    transform: translate(-50%, -50%);
-  }
-  .match-summary-mark::after {
-    transform: translate(-50%, -50%) rotate(90deg);
-    transition: opacity 0.18s ease;
-  }
-  .match-details[open] .match-summary-mark::after {
-    opacity: 0;
-  }
-</style>
+  </div>
+</div>

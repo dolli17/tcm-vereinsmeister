@@ -1,21 +1,67 @@
-// Logik rund um die Ergebnis-Eintragung durch Spieler:innen.
+// Logik rund um die Ergebnis-Eintragung (Spieler & Admin) sowie überfällige
+// Spiele. Arbeitet auf der aktiven Saison; Ergebnisse hängen über match_id an den
+// Paarungen (matches).
 import { getDb } from './db';
 import {
-  RAW_EINZEL,
-  RAW_DAMEN_EINZEL,
-  RAW_DOPPEL,
-  RAW_DAMEN_DOPPEL,
-  RAW_MIXED,
-  matchKey,
+  getActiveSeason,
+  getCompetition,
+  getCompetitions,
+  getEnrichedMatches,
+  getMatchRows,
+  getSeason,
+  monthIndex,
   teamPlayers,
-  type Wettbewerb,
-} from './fixtures';
-import { getEinzelMatches, getDoppelMatches, getMixedMatches } from './results';
+  type Competition,
+  type EnrichedMatch,
+  type ErgebnisTyp,
+} from './tournament';
 
 export type ResultStatus = 'open' | 'pending' | 'confirmed' | 'rejected';
 
+// Auflösung einer Paarung auf Spielernamen — für Teilnahme-Prüfung & Mails.
+export type FixtureRef = {
+  matchId: number;
+  competitionId: number;
+  wettbewerb: string; // slug
+  wettbewerbLabel: string; // Anzeigename der Konkurrenz
+  gruppe: number | null;
+  runde: string | null;
+  nr: number;
+  sideA: string[];
+  sideB: string[];
+  seasonId: number;
+  seasonStatus: string; // 'aktiv' | 'archiviert' — Eintragung nur in aktiver Saison
+};
+
+export function findFixtureById(matchId: number): FixtureRef | null {
+  const row = getDb()
+    .prepare('SELECT * FROM matches WHERE id = ?')
+    .get(matchId) as
+    | { id: number; competition_id: number; gruppe: number | null; runde: string | null; nr: number; side_a: string | null; side_b: string | null }
+    | undefined;
+  if (!row) return null;
+  const comp = getCompetition(row.competition_id);
+  if (!comp) return null;
+  const season = getSeason(comp.season_id);
+  if (!season) return null;
+  return {
+    matchId: row.id,
+    competitionId: comp.id,
+    wettbewerb: comp.slug,
+    wettbewerbLabel: comp.name,
+    gruppe: row.gruppe,
+    runde: row.runde,
+    nr: row.nr,
+    sideA: teamPlayers(row.side_a),
+    sideB: teamPlayers(row.side_b),
+    seasonId: season.id,
+    seasonStatus: season.status,
+  };
+}
+
 export type PlayerMatch = {
-  wettbewerb: Wettbewerb;
+  matchId: number;
+  wettbewerb: string;
   wettbewerbLabel: string;
   gruppe: number | null;
   runde: string | null;
@@ -26,6 +72,9 @@ export type PlayerMatch = {
   partner: string[];
   gegner: string[];
   isBye: boolean;
+  // KO-Platzhalter ("Sieger Match 3"): Gegner steht noch nicht fest — kein Freilos.
+  gegnerOffen: boolean;
+  termin: string | null;
   status: ResultStatus;
   result: string | null;
   sieger: 'A' | 'B' | null;
@@ -37,105 +86,109 @@ export type PlayerMatch = {
   resultId: number | null;
 };
 
-const WETTBEWERB_LABEL: Record<Wettbewerb, string> = {
-  herren: 'Herren Einzel',
-  damen: 'Damen Einzel',
-  doppel: 'Herren Doppel',
-  'damen-doppel': 'Damen Doppel',
-  mixed: 'Mixed Doppel',
-};
-
 type DbResult = {
   id: number;
+  match_id: number;
   status: ResultStatus;
   satz1: string | null;
   satz2: string | null;
   mtb: string | null;
   sieger: 'A' | 'B' | null;
+  ergebnis_typ: ErgebnisTyp;
   submitted_by: number | null;
   submitter_name: string | null;
   reject_reason: string | null;
 };
 
-function formatResult(r: { satz1: string | null; satz2: string | null; mtb: string | null }): string {
-  return [r.satz1, r.satz2, r.mtb].filter(Boolean).join(' · ');
+function formatResult(r: { satz1: string | null; satz2: string | null; mtb: string | null; ergebnis_typ?: ErgebnisTyp }): string {
+  const base = [r.satz1, r.satz2, r.mtb].filter(Boolean).join(' · ');
+  if (r.ergebnis_typ === 'wo') return 'kampflos (w.o.)';
+  if (r.ergebnis_typ === 'aufgabe') return base ? `${base} · Aufgabe` : 'Aufgabe';
+  return base;
 }
 
-// Wählt den relevantesten Ergebnis-Datensatz pro Fixture: confirmed > pending > rejected.
-function relevantResultMap(): Map<string, DbResult> {
+// Relevantestes Ergebnis je match_id (confirmed > pending > rejected) für eine Saison.
+function relevantResultByMatch(seasonId: number): Map<number, DbResult> {
   const rows = getDb()
     .prepare(
-      `SELECT r.id, r.wettbewerb, r.gruppe, r.runde, r.match_nr, r.status, r.satz1, r.satz2, r.mtb, r.sieger,
+      `SELECT r.id, r.match_id, r.status, r.satz1, r.satz2, r.mtb, r.sieger, r.ergebnis_typ,
               r.submitted_by, u.player_name AS submitter_name, r.reject_reason, r.created_at
-       FROM results r LEFT JOIN users u ON u.id = r.submitted_by ORDER BY r.created_at ASC`,
+       FROM results r
+       JOIN matches m ON m.id = r.match_id
+       JOIN competitions c ON c.id = m.competition_id
+       LEFT JOIN users u ON u.id = r.submitted_by
+       WHERE c.season_id = ? AND r.match_id IS NOT NULL
+       ORDER BY r.created_at ASC`,
     )
-    .all() as (DbResult & { wettbewerb: string; gruppe: number | null; runde: string | null; match_nr: number })[];
+    .all(seasonId) as (DbResult & { created_at: string })[];
   const rank: Record<ResultStatus, number> = { confirmed: 3, pending: 2, rejected: 1, open: 0 };
-  const map = new Map<string, DbResult>();
+  const map = new Map<number, DbResult>();
   for (const r of rows) {
-    const key = matchKey(r.wettbewerb as Wettbewerb, { gruppe: r.gruppe, runde: r.runde, nr: r.match_nr });
-    const existing = map.get(key);
-    if (!existing || rank[r.status] >= rank[existing.status]) map.set(key, r);
+    const existing = map.get(r.match_id);
+    if (!existing || rank[r.status] >= rank[existing.status]) map.set(r.match_id, r);
   }
   return map;
 }
 
-type RawFixture = { wettbewerb: Wettbewerb; gruppe: number | null; runde: string | null; nr: number; sideA: string[]; sideB: string[] };
+type CompMatch = { comp: Competition; m: EnrichedMatch };
 
-function allFixtures(): RawFixture[] {
-  const list: RawFixture[] = [];
-  for (const m of RAW_EINZEL) list.push({ wettbewerb: 'herren', gruppe: m.gruppe, runde: null, nr: m.nr, sideA: [m.spielerA], sideB: [m.spielerB] });
-  for (const m of RAW_DAMEN_EINZEL) list.push({ wettbewerb: 'damen', gruppe: m.gruppe, runde: null, nr: m.nr, sideA: [m.spielerA], sideB: [m.spielerB] });
-  for (const m of RAW_DOPPEL) list.push({ wettbewerb: 'doppel', gruppe: null, runde: m.runde, nr: m.nr, sideA: teamPlayers(m.doppelA), sideB: teamPlayers(m.doppelB) });
-  for (const m of RAW_DAMEN_DOPPEL) list.push({ wettbewerb: 'damen-doppel', gruppe: null, runde: m.runde, nr: m.nr, sideA: teamPlayers(m.doppelA), sideB: teamPlayers(m.doppelB) });
-  for (const m of RAW_MIXED) list.push({ wettbewerb: 'mixed', gruppe: null, runde: m.runde, nr: m.nr, sideA: teamPlayers(m.teamA), sideB: teamPlayers(m.teamB) });
-  return list;
+function activeCompMatches(seasonId: number): CompMatch[] {
+  const out: CompMatch[] = [];
+  for (const comp of getCompetitions(seasonId)) {
+    for (const m of getEnrichedMatches(comp.id)) out.push({ comp, m });
+  }
+  return out;
 }
 
-// Alle Spiele einer Spielerin / eines Spielers mit aktuellem Status.
-export function getPlayerMatches(playerName: string, userId: number): PlayerMatch[] {
-  const resultMap = relevantResultMap();
+// Alle Spiele einer Spielerin / eines Spielers (aktive Saison) mit Status.
+export function getPlayerMatches(playerName: string, userId: number, seasonId?: number): PlayerMatch[] {
+  const season = seasonId != null ? { id: seasonId } : getActiveSeason();
+  if (!season) return [];
+  const resultMap = relevantResultByMatch(season.id);
   const out: PlayerMatch[] = [];
 
-  for (const f of allFixtures()) {
-    const inA = f.sideA.includes(playerName);
-    const inB = f.sideB.includes(playerName);
+  for (const { comp, m } of activeCompMatches(season.id)) {
+    const sideA = teamPlayers(m.sideA);
+    const sideB = teamPlayers(m.sideB);
+    const inA = sideA.includes(playerName);
+    const inB = sideB.includes(playerName);
     if (!inA && !inB) continue;
 
     const meineSeite: 'A' | 'B' = inA ? 'A' : 'B';
-    const ownSide = inA ? f.sideA : f.sideB;
-    const otherSide = inA ? f.sideB : f.sideA;
-    if (ownSide.length === 0) continue; // Datenanomalie: eigene Seite leer
-    // Freilos: Gegnerseite leer (BYE) → wird angezeigt, aber kein Ergebnis nötig.
-    const isBye = otherSide.length === 0;
-    const res = resultMap.get(matchKey(f.wettbewerb, { gruppe: f.gruppe, runde: f.runde, nr: f.nr }));
+    const ownSide = inA ? sideA : sideB;
+    const otherSide = inA ? sideB : sideA;
+    if (ownSide.length === 0) continue;
+    const rawOther = inA ? m.sideB : m.sideA;
+    const isBye = otherSide.length === 0 && (!rawOther || rawOther === 'BYE');
+    const gegnerOffen = otherSide.length === 0 && !isBye;
+    const res = resultMap.get(m.id);
     const status: ResultStatus = res ? res.status : 'open';
     const ichGewonnen = res && res.sieger ? res.sieger === meineSeite : null;
-    // Gegner darf ein offenes (pending) Ergebnis bestätigen/ablehnen, wenn der/die
-    // Eintragende auf der anderen Seite steht.
     const submitterOnOtherSide = res?.submitter_name ? otherSide.includes(res.submitter_name) : false;
     const canDecide = status === 'pending' && res?.submitted_by !== userId && submitterOnOtherSide;
 
     out.push({
-      wettbewerb: f.wettbewerb,
-      wettbewerbLabel: WETTBEWERB_LABEL[f.wettbewerb],
-      gruppe: f.gruppe,
-      runde: f.runde,
-      nr: f.nr,
-      sideA: f.sideA,
-      sideB: f.sideB,
+      matchId: m.id,
+      wettbewerb: comp.slug,
+      wettbewerbLabel: comp.name,
+      gruppe: m.gruppe,
+      runde: m.runde,
+      nr: m.nr,
+      sideA,
+      sideB,
       meineSeite,
       partner: ownSide.filter((p) => p !== playerName),
-      gegner: isBye ? [] : otherSide,
+      gegner: otherSide,
       isBye,
+      gegnerOffen,
+      termin: m.termin,
       status,
       result: res && (res.status === 'confirmed' || res.status === 'pending') ? formatResult(res) : null,
       sieger: res?.sieger ?? null,
       ichGewonnen,
       submittedByMe: res?.submitted_by === userId,
       rejectReason: res?.status === 'rejected' ? res.reject_reason : null,
-      // Abgelehnte Partien gehen NICHT zurück an die Spieler; Freilose haben kein Ergebnis.
-      canEnter: status === 'open' && !isBye,
+      canEnter: status === 'open' && otherSide.length > 0,
       canDecide,
       resultId: res?.id ?? null,
     });
@@ -144,54 +197,58 @@ export function getPlayerMatches(playerName: string, userId: number): PlayerMatc
 }
 
 export type AdminFixture = {
-  wettbewerb: Wettbewerb;
+  matchId: number;
+  wettbewerb: string;
   wettbewerbLabel: string;
   gruppe: number | null;
   runde: string | null;
   nr: number;
   sideA: string[];
   sideB: string[];
-  isBye: boolean;
   status: ResultStatus;
   satz1: string | null;
   satz2: string | null;
   mtb: string | null;
   sieger: 'A' | 'B' | null;
+  ergebnisTyp: ErgebnisTyp;
   result: string | null;
   resultId: number | null;
 };
 
-// Alle Fixtures (ohne Freilose) mit ihrem aktuellen Ergebnis/Status — für die Admin-Verwaltung.
-export function getAllFixturesWithStatus(): AdminFixture[] {
-  const resultMap = relevantResultMap();
-  return allFixtures()
-    .filter((f) => f.sideA.length > 0 && f.sideB.length > 0)
-    .map((f) => {
-      const res = resultMap.get(matchKey(f.wettbewerb, { gruppe: f.gruppe, runde: f.runde, nr: f.nr }));
-      return {
-        wettbewerb: f.wettbewerb,
-        wettbewerbLabel: WETTBEWERB_LABEL[f.wettbewerb],
-        gruppe: f.gruppe,
-        runde: f.runde,
-        nr: f.nr,
-        sideA: f.sideA,
-        sideB: f.sideB,
-        isBye: false,
-        status: res ? res.status : 'open',
-        satz1: res?.satz1 ?? null,
-        satz2: res?.satz2 ?? null,
-        mtb: res?.mtb ?? null,
-        sieger: res?.sieger ?? null,
-        result: res && (res.status === 'confirmed' || res.status === 'pending') ? formatResult(res) : null,
-        resultId: res?.id ?? null,
-      };
+// Alle Paarungen (ohne Freilose) mit aktuellem Ergebnis/Status — Admin-Verwaltung.
+export function getAllFixturesWithStatus(seasonId?: number): AdminFixture[] {
+  const season = seasonId != null ? { id: seasonId } : getActiveSeason();
+  if (!season) return [];
+  const resultMap = relevantResultByMatch(season.id);
+  const out: AdminFixture[] = [];
+  for (const { comp, m } of activeCompMatches(season.id)) {
+    const sideA = teamPlayers(m.sideA);
+    const sideB = teamPlayers(m.sideB);
+    if (sideA.length === 0 || sideB.length === 0) continue;
+    const res = resultMap.get(m.id);
+    out.push({
+      matchId: m.id,
+      wettbewerb: comp.slug,
+      wettbewerbLabel: comp.name,
+      gruppe: m.gruppe,
+      runde: m.runde,
+      nr: m.nr,
+      sideA,
+      sideB,
+      status: res ? res.status : 'open',
+      satz1: res?.satz1 ?? null,
+      satz2: res?.satz2 ?? null,
+      mtb: res?.mtb ?? null,
+      sieger: res?.sieger ?? null,
+      ergebnisTyp: res?.ergebnis_typ ?? 'gespielt',
+      result: res && (res.status === 'confirmed' || res.status === 'pending') ? formatResult(res) : null,
+      resultId: res?.id ?? null,
     });
+  }
+  return out;
 }
 
 // ── Überfällige Spiele (für Admin-Übersicht) ────────────────────────────────
-const MONTH_NAME2NUM: Record<string, number> = { Mai: 5, Juni: 6, Juli: 7 };
-const NUM2MONTH: Record<number, string> = { 5: 'Mai', 6: 'Juni', 7: 'Juli' };
-
 export type OverdueMatch = {
   wettbewerbLabel: string;
   context: string;
@@ -201,34 +258,27 @@ export type OverdueMatch = {
   dueName: string;
 };
 
-// Offene Spiele, deren Fälligkeitsmonat VOR dem aktuellen Monat liegt.
-// Doppel/Mixed: 1. Runde = Mai fällig; spätere Runden ohne feste Frist.
-export function getOverdueMatches(now: Date = new Date()): OverdueMatch[] {
-  const cur = now.getMonth() + 1;
-  const open = (s: 'A' | 'B' | null) => s !== 'A' && s !== 'B';
+// Offene Spiele, deren Fälligkeitsmonat (Saisonjahr + match.monat) vor dem
+// aktuellen Monat liegt — jahresübergreifend, damit eine im Vorjahr gestartete
+// Saison nicht ab Januar "unauffällig" wird.
+export function getOverdueMatches(now: Date = new Date(), seasonId?: number): OverdueMatch[] {
+  const season = seasonId != null ? getSeason(seasonId) : getActiveSeason();
+  if (!season) return [];
+  const curYear = now.getFullYear();
+  const cur = now.getMonth() + 1; // 1..12
   const out: OverdueMatch[] = [];
-  const push = (label: string, context: string, nr: number, a: string[], b: string[], dueNum: number | null) => {
-    if (a.length === 0 || b.length === 0) return; // Freilos/Platzhalter
-    if (dueNum == null || dueNum >= cur) return; // nicht überfällig
-    out.push({ wettbewerbLabel: label, context, nr, sideA: a, sideB: b, dueName: NUM2MONTH[dueNum] ?? String(dueNum) });
-  };
-  const dueOfRound = (r: string) => (r === '1. Runde' ? 5 : null);
-
-  for (const k of ['herren', 'damen'] as Wettbewerb[]) {
-    for (const m of getEinzelMatches(k as 'herren' | 'damen')) {
-      if (!open(m.sieger)) continue;
-      push(WETTBEWERB_LABEL[k], `Gruppe ${m.gruppe}`, m.nr, [m.spielerA], [m.spielerB], MONTH_NAME2NUM[m.monat] ?? null);
-    }
-  }
-  for (const w of ['doppel', 'damen-doppel'] as ('doppel' | 'damen-doppel')[]) {
-    for (const m of getDoppelMatches(w)) {
-      if (!open(m.sieger)) continue;
-      push(WETTBEWERB_LABEL[w], m.runde, m.nr, teamPlayers(m.doppelA), teamPlayers(m.doppelB), dueOfRound(m.runde));
-    }
-  }
-  for (const m of getMixedMatches()) {
-    if (!open(m.sieger)) continue;
-    push(WETTBEWERB_LABEL['mixed'], m.runde, m.nr, teamPlayers(m.teamA), teamPlayers(m.teamB), dueOfRound(m.runde));
+  for (const { comp, m } of activeCompMatches(season.id)) {
+    if (m.sieger === 'A' || m.sieger === 'B') continue;
+    const a = teamPlayers(m.sideA);
+    const b = teamPlayers(m.sideB);
+    if (a.length === 0 || b.length === 0) continue;
+    if (!m.monat) continue;
+    const dueIdx = monthIndex(m.monat) + 1; // monthIndex ist 0-basiert
+    if (dueIdx > 12) continue;
+    const overdue = season.jahr < curYear || (season.jahr === curYear && dueIdx < cur);
+    if (!overdue) continue;
+    const context = m.gruppe != null ? `Gruppe ${m.gruppe}` : m.runde ?? '';
+    out.push({ wettbewerbLabel: comp.name, context, nr: m.nr, sideA: a, sideB: b, dueName: `${m.monat} ${season.jahr}` });
   }
   return out;
 }
@@ -242,8 +292,39 @@ function parseSet(s: string): { a: number; b: number } | null {
 
 export type ScoreInput = { satz1: string; satz2: string; mtb?: string | null };
 export type ValidScore = { satz1: string; satz2: string; mtb: string | null; sieger: 'A' | 'B' };
+// Vereinheitlichte Eintragung inkl. Sonderfälle (kampflos/Aufgabe): Sätze dürfen
+// dort fehlen, der Sieger muss explizit angegeben werden.
+export type EntryScore = { satz1: string | null; satz2: string | null; mtb: string | null; sieger: 'A' | 'B'; typ: ErgebnisTyp };
+export type EntryInput = { typ: string; satz1?: string | null; satz2?: string | null; mtb?: string | null; sieger?: string | null };
 
-// Validiert die Eingabe und leitet den Sieger aus den Sätzen ab (Client-Sieger wird ignoriert).
+export function validateEntry(input: EntryInput): { ok: true; score: EntryScore } | { ok: false; error: string } {
+  const typ = ['gespielt', 'wo', 'aufgabe'].includes(input.typ) ? (input.typ as ErgebnisTyp) : 'gespielt';
+
+  if (typ === 'gespielt') {
+    const v = validateScore({ satz1: input.satz1 ?? '', satz2: input.satz2 ?? '', mtb: input.mtb });
+    return v.ok ? { ok: true, score: { ...v.score, typ } } : v;
+  }
+
+  const sieger = input.sieger === 'A' || input.sieger === 'B' ? input.sieger : null;
+  if (!sieger) return { ok: false, error: 'Bitte angeben, wer das Spiel gewonnen hat.' };
+
+  if (typ === 'wo') return { ok: true, score: { satz1: null, satz2: null, mtb: null, sieger, typ } };
+
+  // Aufgabe: erfasste Sätze sind optional, müssen aber lesbar sein.
+  const parts: (string | null)[] = [];
+  for (const raw of [input.satz1, input.satz2, input.mtb]) {
+    const t = (raw ?? '').trim();
+    if (!t) {
+      parts.push(null);
+      continue;
+    }
+    const p = parseSet(t);
+    if (!p) return { ok: false, error: 'Sätze bitte im Format z. B. 6:3 eingeben (oder leer lassen).' };
+    parts.push(`${p.a}:${p.b}`);
+  }
+  return { ok: true, score: { satz1: parts[0], satz2: parts[1], mtb: parts[2], sieger, typ } };
+}
+
 export function validateScore(input: ScoreInput): { ok: true; score: ValidScore } | { ok: false; error: string } {
   const s1 = parseSet(input.satz1 ?? '');
   const s2 = parseSet(input.satz2 ?? '');

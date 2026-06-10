@@ -1,5 +1,5 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import AuthShell from '../components/AuthShell.astro';
 
 if (Astro.locals.user) return Astro.redirect('/meine-spiele');
 
@@ -12,51 +12,16 @@ const errorMsg =
   null;
 ---
 
-<Layout title="Anmelden · Vereinsmeisterschaft">
-  <main class="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-10">
-    <a href="/" class="label-mono text-club-blue">← Zur Übersicht</a>
-    <h1 class="mt-5 font-serif text-4xl leading-tight text-deep-ink">Anmelden</h1>
-    <p class="mt-2 text-[15px] leading-relaxed text-muted">Melde dich mit E-Mail und Passwort an.</p>
+<AuthShell title="Anmelden · Vereinsmeisterschaft" heading="Anmelden" sub="Melde dich mit E-Mail und Passwort an." back={{ href: '/', label: '← Zur Übersicht' }}>
+  {resetDone && <div class="notice ok">Passwort geändert. Du kannst dich jetzt anmelden.</div>}
+  {errorMsg && <div class="notice err">{errorMsg}</div>}
 
-    {resetDone && (
-      <div class="mt-6 rounded-sm border border-club-blue/30 bg-club-blue/5 px-4 py-3 text-[15px] text-deep-ink">Passwort geändert. Du kannst dich jetzt anmelden.</div>
-    )}
-    {errorMsg && (
-      <div class="mt-6 rounded-sm border border-court-red/30 bg-court-red/5 px-4 py-3 text-[15px] text-deep-ink">{errorMsg}</div>
-    )}
+  <form method="POST" action="/api/auth/login">
+    <label class="field"><span class="lbl">E-Mail</span><input class="input" type="email" name="email" required placeholder="du@example.com" autocomplete="email" /></label>
+    <label class="field"><span class="lbl">Passwort</span><input class="input" type="password" name="password" required placeholder="••••••••" autocomplete="current-password" /></label>
+    <button type="submit" class="btn block">Anmelden</button>
+  </form>
 
-    <form method="POST" action="/api/auth/login" class="mt-6 grid gap-3">
-      <label class="block">
-        <span class="label-mono mb-1.5 block text-muted-2">E-Mail</span>
-        <input class="auth-input" type="email" name="email" required placeholder="du@example.com" autocomplete="email" />
-      </label>
-      <label class="block">
-        <span class="label-mono mb-1.5 block text-muted-2">Passwort</span>
-        <input class="auth-input" type="password" name="password" required placeholder="••••••••" autocomplete="current-password" />
-      </label>
-      <button type="submit" class="auth-button">Anmelden</button>
-    </form>
-
-    <p class="mt-4 text-sm text-muted">
-      <a href="/passwort-vergessen" class="text-club-blue underline">Passwort vergessen?</a>
-    </p>
-    <p class="mt-2 text-sm text-muted">
-      Noch kein Account? <a href="/registrieren" class="text-club-blue underline">Hier registrieren</a>
-    </p>
-  </main>
-
-  <style>
-    .auth-input {
-      width: 100%; min-height: 48px; border: 1px solid rgba(26, 31, 46, 0.18);
-      border-radius: 6px; padding: 0.75rem 0.9rem; color: var(--color-deep-ink);
-      background: rgba(255, 255, 255, 0.7); font: inherit; outline: none;
-    }
-    .auth-input:focus { border-color: var(--color-deep-ink); }
-    .auth-button {
-      cursor: pointer; min-height: 48px; border-radius: 6px;
-      border: 1px solid var(--color-deep-ink); background: var(--color-deep-ink); color: #fff;
-      font-family: var(--font-mono); font-size: 12px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase;
-    }
-    .auth-button:active { transform: translateY(1px); }
-  </style>
-</Layout>
+  <div class="linkrow"><a href="/passwort-vergessen">Passwort vergessen?</a></div>
+  <div class="linkrow">Noch kein Account? <a href="/registrieren">Hier registrieren</a></div>
+</AuthShell>

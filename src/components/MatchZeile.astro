@@ -1,14 +1,16 @@
 ---
-import type { Match } from '../lib/standings';
-import { isMatchPlayed, formatResult, matchStatus } from '../lib/standings';
+import type { EnrichedMatch } from '../lib/tournament';
+import { formatResult, matchStatus } from '../lib/standings';
 
-type Props = { match: Match };
+type Props = { match: EnrichedMatch };
 const { match } = Astro.props;
 
 const status = matchStatus(match);
 const result = formatResult(match);
 const winnerIsA = match.sieger === 'A';
 const winnerIsB = match.sieger === 'B';
+const spielerA = match.sideA ?? '';
+const spielerB = match.sideB ?? '';
 ---
 
 <div
@@ -16,7 +18,7 @@ const winnerIsB = match.sieger === 'B';
   data-match-row
   data-status={status}
   data-monat={match.monat}
-  data-players={`${match.spielerA}|${match.spielerB}`}
+  data-players={`${spielerA}|${spielerB}`}
 >
   <div class="font-mono text-[11px] tabular-nums text-muted-2">
     {String(match.nr).padStart(2, '0')}
@@ -25,11 +27,11 @@ const winnerIsB = match.sieger === 'B';
   <div class="min-w-0">
     <div class="flex flex-col gap-0.5 text-[15px] leading-tight sm:flex-row sm:items-center sm:gap-2">
       <span class={`truncate ${winnerIsA ? 'font-semibold text-deep-ink' : winnerIsB ? 'text-muted-2' : 'text-deep-ink'}`}>
-        {match.spielerA}
+        {spielerA}
       </span>
       <span class="hidden font-mono text-[10px] uppercase tracking-wider text-muted-2 sm:inline">vs</span>
       <span class={`truncate ${winnerIsB ? 'font-semibold text-deep-ink' : winnerIsA ? 'text-muted-2' : 'text-deep-ink'}`}>
-        {match.spielerB}
+        {spielerB}
       </span>
     </div>
     {match.termin && status !== 'gespielt' && (

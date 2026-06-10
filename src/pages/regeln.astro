@@ -1,0 +1,83 @@
+---
+import AppShell from '../components/AppShell.astro';
+import { getCompetitions, listSeasons, resolveSeason } from '../lib/tournament';
+
+const jahrParam = Number(Astro.url.searchParams.get('saison'));
+const season = resolveSeason(Number.isFinite(jahrParam) && jahrParam > 0 ? jahrParam : null);
+const seasons = listSeasons();
+const competitions = season ? getCompetitions(season.id) : [];
+
+const ABLAUF_GRUPPE = [
+  'Gruppenphase: Die Paarungen sind monatsweise vorgegeben; die Vereinsmeisterschaft läuft von Mai bis September.',
+  'Den konkreten Termin stimmen beide Seiten innerhalb des Monats selbständig ab und melden ihn vor dem Spiel dem Sportwart.',
+  'Nach dem Spiel wird das Ergebnis dem Sportwart gemeldet. Die ersten zwei jeder Gruppe qualifizieren sich für die K.o.-Runde.',
+];
+const ABLAUF_KO = [
+  'Direkt im K.o.-System — keine Gruppenphase: Sieger rücken in die nächste Runde vor, Verlierer scheiden aus.',
+  'Die Paarungen stehen im Turnierbaum. Termine stimmt ihr selbständig ab und meldet sie vor dem Spiel dem Sportwart.',
+  'Nach dem Spiel wird das Ergebnis gemeldet, damit die nächste Runde aktualisiert werden kann.',
+];
+const SATZPUNKTE = [
+  ['6:0', '8', '0'],
+  ['6:1 bis 6:4', '7', '0'],
+  ['7:5', '6', '1'],
+  ['7:6 TB', '4', '2'],
+  ['7:6 MTB', '5', '3'],
+];
+const FLAG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>';
+const TARGET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>';
+---
+
+<AppShell active="rules" season={season} seasons={seasons} title="Regeln · Vereinsmeisterschaft">
+  <div class="section-title">Regeln &amp; Ablauf</div>
+  <div class="section-sub">Disziplin oben wählen.</div>
+
+  {competitions.length === 0 ? (
+    <div class="empty"><div class="t">Keine Konkurrenzen</div><div class="d">Für diese Saison sind keine Regeln hinterlegt.</div></div>
+  ) : (
+    <>
+      <div class="disc-rail">
+        {competitions.map((c, i) => (
+          <button class="disc-chip" data-on={i === 0 ? '1' : '0'} data-disc={i}><span class="dot"></span>{c.name}</button>
+        ))}
+      </div>
+
+      {competitions.map((c, i) => (
+        <div data-panel={i} hidden={i !== 0} class="info-block">
+          <div class="info-card">
+            <h3><span class="ic" set:html={FLAG} /> Ablauf</h3>
+            <div class="steps">
+              {(c.modus === 'gruppe' ? ABLAUF_GRUPPE : ABLAUF_KO).map((p) => (
+                <div class="step"><span class="n"></span><p>{p}</p></div>
+              ))}
+            </div>
+          </div>
+
+          {c.modus === 'gruppe' && (
+            <div class="info-card">
+              <h3><span class="ic" set:html={TARGET} /> Punktesystem</h3>
+              <table class="pts-table">
+                <thead><tr><th>Satzergebnis</th><th class="r">Sieger</th><th class="r">Verlierer</th></tr></thead>
+                <tbody>{SATZPUNKTE.map((r) => <tr><td>{r[0]}</td><td class="r">{r[1]}</td><td class="r">{r[2]}</td></tr>)}</tbody>
+              </table>
+              <div class="bonus-row">
+                <div class="bonus"><div class="v">+9</div><div class="l">Sieg in zwei Sätzen</div></div>
+                <div class="bonus"><div class="v">+3</div><div class="l">Sieg in drei Sätzen</div></div>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </>
+  )}
+</AppShell>
+
+<script>
+  const chips = document.querySelectorAll<HTMLButtonElement>('[data-disc]');
+  const panels = document.querySelectorAll<HTMLElement>('[data-panel]');
+  chips.forEach((chip) => chip.addEventListener('click', () => {
+    const i = chip.dataset.disc;
+    chips.forEach((c) => c.dataset.on = c === chip ? '1' : '0');
+    panels.forEach((p) => { p.hidden = p.dataset.panel !== i; });
+  }));
+</script>

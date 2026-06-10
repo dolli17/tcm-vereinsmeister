@@ -1,210 +1,203 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import Header from '../components/Header.astro';
-import InfoBereich from '../components/InfoBereich.astro';
-import MeineSpiele from '../components/MeineSpiele.astro';
+import AppShell from '../components/AppShell.astro';
 import GruppenCard from '../components/GruppenCard.astro';
-import DoppelView from '../components/DoppelView.astro';
-import DamenDoppelView from '../components/DamenDoppelView.astro';
-import MixedDoppelView from '../components/MixedDoppelView.astro';
-import { getGruppen } from '../lib/standings';
+import KOView from '../components/KOView.astro';
+import {
+  getCompetitions,
+  getEnrichedMatches,
+  getGruppen,
+  isPlayed,
+  listSeasons,
+  monthIndex,
+  resolveSeason,
+  teamPlayers,
+} from '../lib/tournament';
+import { formatResult } from '../lib/standings';
 
-const gruppen = getGruppen();
-const damenGruppen = getGruppen('damen');
-const monate = ['Alle', 'Mai', 'Juni', 'Juli'] as const;
-const stati = ['Alle', 'Offen', 'Terminiert', 'Gespielt'] as const;
+const jahrParam = Number(Astro.url.searchParams.get('saison'));
+const season = resolveSeason(Number.isFinite(jahrParam) && jahrParam > 0 ? jahrParam : null);
+const seasons = listSeasons();
+const competitions = season ? getCompetitions(season.id) : [];
+
+const result = formatResult;
+
+// Render-Daten je Konkurrenz vorbereiten (Matches nur einmal laden).
+const panels = competitions.map((comp) => {
+  const matches = getEnrichedMatches(comp.id);
+  if (comp.modus === 'gruppe') {
+    const gruppen = getGruppen(comp.id);
+    const monate = Array.from(new Set(matches.map((m) => m.monat).filter((mo): mo is string => !!mo)))
+      .sort((a, b) => monthIndex(a) - monthIndex(b));
+    const planByMonth = [...monate, ''].map((mo) => ({
+      monat: mo,
+      // '' sammelt Spiele ohne Fälligkeitsmonat ("Termin offen") — sie müssen
+      // im Spielplan sichtbar bleiben.
+      list: matches.filter((m) => (m.monat ?? '') === mo).sort((a, b) => a.nr - b.nr),
+    })).filter((g) => g.list.length > 0);
+    return { comp, kind: 'gruppe' as const, matches, gruppen, monate, planByMonth };
+  }
+  return { comp, kind: 'ko' as const, matches, gruppen: [], monate: [], planByMonth: [] };
+});
+
+// Fortschritt über alle Konkurrenzen (Freilose/Platzhalter ausgenommen).
+let done = 0, total = 0;
+for (const p of panels) {
+  for (const m of p.matches) {
+    if (teamPlayers(m.sideA).length === 0 || teamPlayers(m.sideB).length === 0) continue;
+    total++; if (isPlayed(m)) done++;
+  }
+}
+const stati = ['Alle', 'Offen', 'Gespielt'];
 ---
 
-<Layout>
-  <Header />
-
-  <nav class="sticky top-0 z-20 border-b border-deep-ink/10 bg-warm-sand/95 shadow-[0_8px_24px_-22px_rgba(26,31,46,0.65)] backdrop-blur-sm">
-    <div class="mx-auto max-w-5xl px-4 sm:px-8">
-      <div role="tablist" aria-label="Konkurrenzen" class="grid grid-cols-3 gap-1 pt-2 sm:flex sm:pt-3">
-        <button type="button" role="tab" aria-selected="true" data-tab="einzel" class="cta-tab is-active">
-          Herren Einzel
-        </button>
-        <button type="button" role="tab" aria-selected="false" data-tab="damen-einzel" class="cta-tab">
-          Damen Einzel
-        </button>
-        <button type="button" role="tab" aria-selected="false" data-tab="doppel" class="cta-tab">
-          Herren Doppel
-        </button>
-        <button type="button" role="tab" aria-selected="false" data-tab="damen-doppel" class="cta-tab">
-          Damen Doppel
-        </button>
-        <button type="button" role="tab" aria-selected="false" data-tab="mixed" class="cta-tab">
-          Mixed Doppel
-        </button>
-      </div>
-
-      <div data-filter-controls class="grid gap-2 py-2.5 sm:py-3">
-        <div data-monat-filter-bar class="-mx-1 flex gap-1 overflow-x-auto no-scrollbar">
-          {monate.map((m) => (
-            <button type="button" data-monat-filter={m} class={`cta-filter ${m === 'Alle' ? 'is-active' : ''}`}>
-              {m}
-            </button>
-          ))}
-        </div>
-
-        <div data-status-filter-bar class="-mx-1 flex gap-1 overflow-x-auto no-scrollbar">
-          {stati.map((s) => (
-            <button type="button" data-status-filter={s.toLowerCase()} class={`cta-filter ${s === 'Alle' ? 'is-active' : ''}`}>
-              {s}
-            </button>
-          ))}
-        </div>
-      </div>
+<AppShell active="comp" season={season} seasons={seasons} showProgress={true} done={done} total={total}>
+  {competitions.length === 0 ? (
+    <div class="empty" style="padding-top:64px">
+      <div class="t">Keine Konkurrenzen</div>
+      <div class="d">Für diese Saison sind noch keine Konkurrenzen angelegt.</div>
     </div>
-  </nav>
+  ) : (
+    <>
+      <div class="disc-rail">
+        {panels.map((p, i) => (
+          <button class="disc-chip" data-on={i === 0 ? '1' : '0'} data-disc={i}>
+            <span class="dot"></span>{p.comp.name}
+          </button>
+        ))}
+      </div>
 
-  <main class="mx-auto max-w-5xl px-4 py-5 sm:px-8 sm:py-10">
-    <InfoBereich />
-    <MeineSpiele />
+      {panels.map((p, i) => (
+        <div data-panel={i} hidden={i !== 0}>
+          {p.kind === 'gruppe' ? (
+            <>
+              <div class="section">
+                <div class="seg">
+                  <button data-view="tab" data-on="1">Tabellen</button>
+                  <button data-view="plan" data-on="0">Spielplan</button>
+                </div>
+              </div>
 
-    <section data-tabpanel="einzel" class="space-y-5 sm:space-y-6">
-      {gruppen.map((g) => <GruppenCard gruppe={g} />)}
-    </section>
+              <div data-sub="tab">
+                <div class="section">
+                  {p.gruppen.map((g, gi) => <GruppenCard competition={p.comp} gruppe={g} index={gi} />)}
+                </div>
+                <div class="legend"><span class="swatch"></span> Markierte Plätze qualifizieren sich für die K.o.-Runde</div>
+              </div>
 
-    <section data-tabpanel="damen-einzel" class="space-y-5 sm:space-y-6" hidden>
-      {damenGruppen.map((g) => <GruppenCard gruppe={g} konkurrenz="damen" />)}
-    </section>
+              <div data-sub="plan" hidden>
+                <div class="filter-bar">
+                  {['Alle', ...p.monate].map((mo) => (
+                    <button class="fchip" data-month={mo} data-on={mo === 'Alle' ? '1' : '0'}>{mo}</button>
+                  ))}
+                  <span style="width:1px;background:var(--line);flex-shrink:0;margin:2px 2px"></span>
+                  {stati.map((s) => (
+                    <button class="fchip" data-status={s.toLowerCase()} data-on={s === 'Alle' ? '1' : '0'}>{s}</button>
+                  ))}
+                </div>
+                <div class="section">
+                  {p.planByMonth.map((mg) => (
+                    <div data-monthgroup={mg.monat}>
+                      <div class="month-head"><span class="m">{mg.monat || 'Termin offen'}</span><span class="ln"></span><span class="ct">{mg.list.length} Spiele</span></div>
+                      <div class="card" style="margin-bottom:18px"><div class="matchlist">
+                        {mg.list.map((m) => (
+                          <div class="match" data-match data-status={isPlayed(m) ? 'gespielt' : 'offen'}>
+                            <div class="match-no">#{m.nr}</div>
+                            <div class="match-body">
+                              <div class={`match-side ${m.sieger === 'A' ? 'win' : ''}`}><span class="nm">{m.sideA}</span></div>
+                              <div class="match-vs">Gruppe {m.gruppe}</div>
+                              <div class={`match-side ${m.sieger === 'B' ? 'win' : ''}`}><span class="nm">{m.sideB}</span></div>
+                            </div>
+                            <div class="match-meta">
+                              {isPlayed(m)
+                                ? <><span class="score">{result(m)}</span><span class="status-tag done">gespielt</span></>
+                                : <span class="status-tag open">offen</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div class="section-title">{p.comp.name}</div>
+              <div class="section-sub">K.o.-System · Sieger rücken vor, Verlierer scheiden aus</div>
+              <KOView competition={p.comp} />
+            </>
+          )}
+        </div>
+      ))}
+    </>
+  )}
 
-    <section data-tabpanel="doppel" hidden>
-      <DoppelView />
-    </section>
+  <p class="section-sub" style="text-align:center;padding:18px 0 8px;display:flex;gap:18px;justify-content:center;flex-wrap:wrap">
+    <a href="/rangliste" style="color:var(--accent);font-weight:700;text-decoration:none">📈 Ewige Rangliste</a>
+    {seasons.some((s) => s.status === 'archiviert') && (
+      <a href="/archiv" style="color:var(--accent);font-weight:700;text-decoration:none">🏆 Saison-Archiv</a>
+    )}
+  </p>
+</AppShell>
 
-    <section data-tabpanel="damen-doppel" hidden>
-      <DamenDoppelView />
-    </section>
+<script>
+  // Disziplin-Chips → Panel umschalten
+  const chips = document.querySelectorAll<HTMLButtonElement>('[data-disc]');
+  const panels = document.querySelectorAll<HTMLElement>('[data-panel]');
+  chips.forEach((chip) => chip.addEventListener('click', () => {
+    const i = chip.dataset.disc;
+    chips.forEach((c) => c.dataset.on = c === chip ? '1' : '0');
+    panels.forEach((p) => { p.hidden = p.dataset.panel !== i; });
+  }));
 
-    <section data-tabpanel="mixed" hidden>
-      <MixedDoppelView />
-    </section>
+  // Tabellen/Spielplan-Umschalter je Panel
+  document.querySelectorAll<HTMLElement>('[data-panel]').forEach((panel) => {
+    const segBtns = panel.querySelectorAll<HTMLButtonElement>('[data-view]');
+    const subTab = panel.querySelector<HTMLElement>('[data-sub="tab"]');
+    const subPlan = panel.querySelector<HTMLElement>('[data-sub="plan"]');
+    segBtns.forEach((b) => b.addEventListener('click', () => {
+      const v = b.dataset.view;
+      segBtns.forEach((x) => x.dataset.on = x === b ? '1' : '0');
+      if (subTab) subTab.hidden = v !== 'tab';
+      if (subPlan) subPlan.hidden = v !== 'plan';
+    }));
 
-    <footer class="mt-12 border-t border-deep-ink/10 pt-6 text-center">
-      <div class="label-mono text-muted-2">TC Muckensturm</div>
-      <p class="mt-2 font-mono text-[11px] text-muted-2">
-        Tippfehler im Ergebnis? Sportwart kontaktieren.
-      </p>
-    </footer>
-  </main>
-
-  <script>
-    const tabs = document.querySelectorAll<HTMLButtonElement>('[data-tab]');
-    const panels = document.querySelectorAll<HTMLElement>('[data-tabpanel]');
-    const monatFilterBar = document.querySelector<HTMLElement>('[data-monat-filter-bar]');
-    const filterControls = document.querySelector<HTMLElement>('[data-filter-controls]');
-    tabs.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const target = btn.dataset.tab;
-        tabs.forEach((b) => {
-          const active = b === btn;
-          b.classList.toggle('is-active', active);
-          b.setAttribute('aria-selected', String(active));
-        });
-        panels.forEach((p) => {
-          p.hidden = p.dataset.tabpanel !== target;
-        });
-        const showFilters = target === 'einzel' || target === 'damen-einzel';
-        if (monatFilterBar) monatFilterBar.hidden = !showFilters;
-        if (filterControls) filterControls.hidden = !showFilters;
-      });
-    });
-
-    const monatBtns = document.querySelectorAll<HTMLButtonElement>('[data-monat-filter]');
-    const statusBtns = document.querySelectorAll<HTMLButtonElement>('[data-status-filter]');
-    let activeMonat = 'Alle';
-    let activeStatus = 'alle';
-
-    function applyMatchFilters() {
-      document.querySelectorAll<HTMLElement>('[data-match-row]').forEach((row) => {
-        const monthOk = activeMonat === 'Alle' || !row.dataset.monat || row.dataset.monat === activeMonat;
-        const statusOk = activeStatus === 'alle' || row.dataset.status === activeStatus;
+    // Filter (Monat/Status) im Spielplan
+    let fMonth = 'Alle', fStatus = 'alle';
+    const apply = () => {
+      panel.querySelectorAll<HTMLElement>('[data-match]').forEach((row) => {
+        const group = row.closest<HTMLElement>('[data-monthgroup]');
+        const mo = group?.dataset.monthgroup ?? '';
+        const monthOk = fMonth === 'Alle' || mo === fMonth;
+        const statusOk = fStatus === 'alle' || row.dataset.status === fStatus;
         row.hidden = !(monthOk && statusOk);
       });
-
-      document.querySelectorAll<HTMLElement>('[data-monat]').forEach((section) => {
-        const rows = Array.from(section.querySelectorAll<HTMLElement>('[data-match-row]'));
-        section.hidden = rows.length > 0 && rows.every((row) => row.hidden);
+      panel.querySelectorAll<HTMLElement>('[data-monthgroup]').forEach((g) => {
+        const rows = Array.from(g.querySelectorAll<HTMLElement>('[data-match]'));
+        g.hidden = rows.length > 0 && rows.every((r) => r.hidden);
       });
-    }
+    };
+    panel.querySelectorAll<HTMLButtonElement>('[data-month]').forEach((b) => b.addEventListener('click', () => {
+      fMonth = b.dataset.month ?? 'Alle';
+      panel.querySelectorAll<HTMLButtonElement>('[data-month]').forEach((x) => x.dataset.on = x === b ? '1' : '0');
+      apply();
+    }));
+    panel.querySelectorAll<HTMLButtonElement>('[data-status]').forEach((b) => b.addEventListener('click', () => {
+      fStatus = b.dataset.status ?? 'alle';
+      panel.querySelectorAll<HTMLButtonElement>('[data-status]').forEach((x) => x.dataset.on = x === b ? '1' : '0');
+      apply();
+    }));
+  });
 
-    monatBtns.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        activeMonat = btn.dataset.monatFilter ?? 'Alle';
-        monatBtns.forEach((b) => b.classList.toggle('is-active', b === btn));
-        applyMatchFilters();
-      });
+  // Gruppen-Spielplan ausklappen
+  document.querySelectorAll<HTMLButtonElement>('[data-collapse]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const el = document.getElementById(btn.dataset.collapse!);
+      if (!el) return;
+      const open = el.getAttribute('data-open') === '1';
+      el.setAttribute('data-open', open ? '0' : '1');
+      btn.setAttribute('data-open', open ? '0' : '1');
+      btn.firstChild && (btn.childNodes[0].textContent = open ? 'Gruppen-Spielplan ansehen ' : 'Spielplan verbergen ');
     });
-
-    statusBtns.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        activeStatus = btn.dataset.statusFilter ?? 'alle';
-        statusBtns.forEach((b) => b.classList.toggle('is-active', b === btn));
-        applyMatchFilters();
-      });
-    });
-  </script>
-
-  <style>
-    .cta-tab {
-      cursor: pointer;
-      min-height: 40px;
-      padding: 0.625rem 0.55rem;
-      border: 1px solid rgba(26, 31, 46, 0.12);
-      border-radius: 4px;
-      font-family: var(--font-mono);
-      font-size: 10px;
-      font-weight: 500;
-      letter-spacing: 1.1px;
-      line-height: 1.1;
-      text-transform: uppercase;
-      color: var(--color-muted);
-      background: transparent;
-      transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
-    }
-    .cta-tab:hover { color: var(--color-deep-ink); }
-    .cta-tab.is-active {
-      color: var(--color-deep-ink);
-      background: var(--color-warm-sand-2);
-      border-color: rgba(26, 31, 46, 0.1);
-    }
-    @media (min-width: 640px) {
-      .cta-tab {
-        min-height: 0;
-        padding: 0.75rem 1.25rem;
-        border-bottom: none;
-        border-bottom-left-radius: 0;
-        border-bottom-right-radius: 0;
-        font-size: 12px;
-        letter-spacing: 1.4px;
-      }
-    }
-
-    .cta-filter {
-      cursor: pointer;
-      flex-shrink: 0;
-      min-height: 34px;
-      padding: 0.55rem 0.85rem;
-      margin: 0 0.125rem;
-      border: 1px solid rgba(26, 31, 46, 0.15);
-      border-radius: 999px;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 1.2px;
-      line-height: 1;
-      text-transform: uppercase;
-      color: var(--color-muted);
-      background: transparent;
-      transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
-    }
-    .cta-filter:hover { color: var(--color-deep-ink); border-color: var(--color-deep-ink); }
-    .cta-filter.is-active {
-      color: #fff;
-      background: var(--color-deep-ink);
-      border-color: var(--color-deep-ink);
-    }
-  </style>
-</Layout>
+  });
+</script>

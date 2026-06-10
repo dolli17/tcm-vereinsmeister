@@ -1,10 +1,15 @@
-import { EINZEL_SPIELER, DAMEN_EINZEL_SPIELER } from './fixtures';
-import { getEinzelMatches } from './results';
+// Tabellenberechnung für Gruppen-Konkurrenzen (Einzel). Arbeitet auf den
+// EnrichedMatches einer Konkurrenz; das tennis-spezifische Punktesystem ist
+// unverändert. side_a/side_b sind im Einzel der jeweilige Spielername.
+import {
+  getCompetitionPlayers,
+  getEnrichedMatches,
+  isPlayed,
+  type EnrichedMatch,
+  type ErgebnisTyp,
+  type Sieger,
+} from './tournament';
 import { getPhoneMap } from './players';
-import type { Monat, Sieger, Konkurrenz, Match, Spieler } from './fixtures';
-
-// Typen weiterhin aus standings re-exportieren (Komponenten importieren von hier).
-export type { Monat, Sieger, Konkurrenz, Match, Spieler };
 
 export type StandingRow = {
   name: string;
@@ -21,15 +26,6 @@ export type StandingRow = {
   platz: number;
 };
 
-// Effektive Daten (Fixtures + bestätigte DB-Ergebnisse) je Konkurrenz.
-function matchesOf(konkurrenz: Konkurrenz): Match[] {
-  return getEinzelMatches(konkurrenz);
-}
-
-function spielerOf(konkurrenz: Konkurrenz): Spieler[] {
-  return konkurrenz === 'damen' ? DAMEN_EINZEL_SPIELER : EINZEL_SPIELER;
-}
-
 function parseSet(set: string | null): { a: number; b: number } | null {
   if (!set) return null;
   const m = set.match(/^(\d+)[:\-](\d+)$/);
@@ -37,8 +33,32 @@ function parseSet(set: string | null): { a: number; b: number } | null {
   return { a: parseInt(m[1], 10), b: parseInt(m[2], 10) };
 }
 
-export function isMatchPlayed(match: Match): boolean {
-  return match.sieger === 'A' || match.sieger === 'B';
+export function isMatchPlayed(match: { sieger: Sieger }): boolean {
+  return isPlayed(match);
+}
+
+export function formatResult(m: { satz1: string | null; satz2: string | null; mtb: string | null; sieger: Sieger; ergebnisTyp?: ErgebnisTyp }): string {
+  if (!isPlayed(m)) return '';
+  const base = [m.satz1, m.satz2, m.mtb].filter(Boolean).join(' · ');
+  if (m.ergebnisTyp === 'wo') return 'kampflos (w.o.)';
+  if (m.ergebnisTyp === 'aufgabe') return base ? `${base} · Aufgabe` : 'Aufgabe';
+  return base;
+}
+
+// Für die Punktewertung zählt ein kampfloser Sieg wie 6:0, 6:0; bei Aufgabe
+// zählen die erfassten Sätze (der Sieg-Bonus kommt regulär dazu).
+function effectiveSets(m: EnrichedMatch): { satz1: string | null; satz2: string | null; mtb: string | null } {
+  if (m.ergebnisTyp === 'wo') {
+    const s = m.sieger === 'A' ? '6:0' : '0:6';
+    return { satz1: s, satz2: s, mtb: null };
+  }
+  return { satz1: m.satz1, satz2: m.satz2, mtb: m.mtb };
+}
+
+export function matchStatus(m: { sieger: Sieger; termin: string | null }): 'gespielt' | 'terminiert' | 'offen' {
+  if (isPlayed(m)) return 'gespielt';
+  if (m.termin) return 'terminiert';
+  return 'offen';
 }
 
 type PlayerStat = {
@@ -65,10 +85,10 @@ function scorePoints(set: { a: number; b: number }, istA: boolean, isMtb: boolea
   return 0;
 }
 
-function playerStats(match: Match, name: string): PlayerStat | null {
-  if (!isMatchPlayed(match)) return null;
-  const istA = match.spielerA === name;
-  const istB = match.spielerB === name;
+function playerStats(match: EnrichedMatch, name: string): PlayerStat | null {
+  if (!isPlayed(match)) return null;
+  const istA = match.sideA === name;
+  const istB = match.sideB === name;
   if (!istA && !istB) return null;
 
   const stat: PlayerStat = {
@@ -80,7 +100,8 @@ function playerStats(match: Match, name: string): PlayerStat | null {
     punkte: 0,
   };
 
-  for (const setStr of [match.satz1, match.satz2]) {
+  const eff = effectiveSets(match);
+  for (const setStr of [eff.satz1, eff.satz2]) {
     const set = parseSet(setStr);
     if (!set) continue;
     const meine = istA ? set.a : set.b;
@@ -92,7 +113,7 @@ function playerStats(match: Match, name: string): PlayerStat | null {
     stat.punkte += scorePoints(set, istA, false);
   }
 
-  const mtb = parseSet(match.mtb);
+  const mtb = parseSet(eff.mtb);
   if (mtb) {
     const meine = istA ? mtb.a : mtb.b;
     const fremde = istA ? mtb.b : mtb.a;
@@ -108,15 +129,16 @@ function playerStats(match: Match, name: string): PlayerStat | null {
   return stat;
 }
 
-export function computeStandings(gruppe: number, konkurrenz: Konkurrenz = 'herren'): StandingRow[] {
-  const spieler = spielerOf(konkurrenz).filter((s) => s.gruppe === gruppe);
-  const matches = matchesOf(konkurrenz).filter((m) => m.gruppe === gruppe);
+// Tabelle einer Gruppe innerhalb einer Konkurrenz (Gruppen-Modus, Einzel).
+export function computeStandings(competitionId: number, gruppe: number): StandingRow[] {
+  const spieler = getCompetitionPlayers(competitionId).filter((s) => s.gruppe === gruppe);
+  const matches = getEnrichedMatches(competitionId).filter((m) => m.gruppe === gruppe);
   const phones = getPhoneMap();
 
   const rows: StandingRow[] = spieler.map((s) => ({
-    name: s.name,
+    name: s.player_name,
     gesetzt: s.gesetzt,
-    telefon: phones[s.name] ?? s.telefon,
+    telefon: phones[s.player_name],
     gespielt: 0,
     siege: 0,
     niederlagen: 0,
@@ -130,8 +152,9 @@ export function computeStandings(gruppe: number, konkurrenz: Konkurrenz = 'herre
   const byName = new Map(rows.map((r) => [r.name, r]));
 
   for (const m of matches) {
-    if (!isMatchPlayed(m)) continue;
-    for (const name of [m.spielerA, m.spielerB]) {
+    if (!isPlayed(m)) continue;
+    for (const name of [m.sideA, m.sideB]) {
+      if (!name) continue;
       const stat = playerStats(m, name);
       const row = byName.get(name);
       if (!stat || !row) continue;
@@ -153,14 +176,14 @@ export function computeStandings(gruppe: number, konkurrenz: Konkurrenz = 'herre
   return rows;
 }
 
-function compareRows(a: StandingRow, b: StandingRow, matches: Match[], allRows: StandingRow[]): number {
+function compareRows(a: StandingRow, b: StandingRow, matches: EnrichedMatch[], allRows: StandingRow[]): number {
   if (a.punkte !== b.punkte) return b.punkte - a.punkte;
 
   const tied = allRows.filter((r) => r.punkte === a.punkte);
   if (tied.length >= 2) {
     const tiedNames = new Set(tied.map((r) => r.name));
     const tiedMatches = matches.filter(
-      (m) => tiedNames.has(m.spielerA) && tiedNames.has(m.spielerB) && isMatchPlayed(m),
+      (m) => m.sideA != null && m.sideB != null && tiedNames.has(m.sideA) && tiedNames.has(m.sideB) && isPlayed(m),
     );
     const ah = h2hAggregate(a.name, tiedMatches);
     const bh = h2hAggregate(b.name, tiedMatches);
@@ -184,7 +207,7 @@ function compareRows(a: StandingRow, b: StandingRow, matches: Match[], allRows: 
   return 0;
 }
 
-function h2hAggregate(name: string, matches: Match[]) {
+function h2hAggregate(name: string, matches: EnrichedMatch[]) {
   const agg = { punkte: 0, saetzeGewonnen: 0, saetzeVerloren: 0, spieleGewonnen: 0, spieleVerloren: 0 };
   for (const m of matches) {
     const s = playerStats(m, name);
@@ -198,36 +221,74 @@ function h2hAggregate(name: string, matches: Match[]) {
   return agg;
 }
 
-export function getMatches(gruppe: number, monat?: Monat, konkurrenz: Konkurrenz = 'herren'): Match[] {
-  let m = matchesOf(konkurrenz).filter((x) => x.gruppe === gruppe);
-  if (monat) m = m.filter((x) => x.monat === monat);
-  return m.slice().sort((a, b) => a.nr - b.nr);
+// Einzelpunkte-Aufschlüsselung für die Spielerstatistik.
+export type PointLine = { result: string; label: string; points: number };
+export type MatchPointBreakdown = {
+  match: EnrichedMatch;
+  opponent: string;
+  status: 'gespielt' | 'terminiert' | 'offen';
+  result: string;
+  won: boolean;
+  lines: PointLine[];
+  bonus: number;
+  total: number;
+};
+
+function scoreSet(set: { a: number; b: number }, isA: boolean, isMtb: boolean): PointLine {
+  const meine = isA ? set.a : set.b;
+  const fremde = isA ? set.b : set.a;
+  const gewonnen = meine > fremde;
+  const winnerGames = Math.max(set.a, set.b);
+  const loserGames = Math.min(set.a, set.b);
+  const result = `${meine}:${fremde}`;
+
+  if (isMtb) return { result, label: gewonnen ? 'Match-Tiebreak gewonnen' : 'Match-Tiebreak verloren', points: gewonnen ? 5 : 3 };
+  if (winnerGames === 6 && loserGames === 0) return { result, label: gewonnen ? '6:0 gewonnen' : '6:0 verloren', points: gewonnen ? 8 : 0 };
+  if (winnerGames === 6 && loserGames >= 1 && loserGames <= 4) return { result, label: gewonnen ? 'Satz gewonnen' : 'Satz verloren', points: gewonnen ? 7 : 0 };
+  if (winnerGames === 7 && loserGames === 5) return { result, label: gewonnen ? 'Verlaengerter Satz gewonnen' : 'Verlaengerter Satz verloren', points: gewonnen ? 6 : 1 };
+  if (winnerGames === 7 && loserGames === 6) return { result, label: gewonnen ? 'Tiebreak gewonnen' : 'Tiebreak verloren', points: gewonnen ? 4 : 2 };
+  return { result, label: 'Nicht gewertetes Satzformat', points: 0 };
 }
 
-export function getAllMatches(monat?: Monat, konkurrenz: Konkurrenz = 'herren'): Match[] {
-  const all = matchesOf(konkurrenz);
-  return monat ? all.filter((x) => x.monat === monat) : all.slice();
-}
+export function explainMatchPoints(match: EnrichedMatch, name: string): MatchPointBreakdown | null {
+  const isA = match.sideA === name;
+  const isB = match.sideB === name;
+  if (!isA && !isB) return null;
 
-export function getGruppen(konkurrenz: Konkurrenz = 'herren'): number[] {
-  return Array.from(new Set(spielerOf(konkurrenz).map((s) => s.gruppe))).sort((a, b) => a - b);
-}
+  const status = matchStatus(match);
+  const won = match.sieger === (isA ? 'A' : 'B');
+  const lines: PointLine[] = [];
+  let setsLost = 0;
 
-export function getSpielerOfGruppe(gruppe: number, konkurrenz: Konkurrenz = 'herren'): Spieler[] {
-  return spielerOf(konkurrenz).filter((s) => s.gruppe === gruppe);
-}
+  const eff = effectiveSets(match);
+  for (const setStr of [eff.satz1, eff.satz2]) {
+    const set = parseSet(setStr);
+    if (!set) continue;
+    lines.push(scoreSet(set, isA, false));
+    const meine = isA ? set.a : set.b;
+    const fremde = isA ? set.b : set.a;
+    if (meine <= fremde) setsLost += 1;
+  }
 
-export function formatResult(m: Match): string {
-  if (!isMatchPlayed(m)) return '';
-  const parts: string[] = [];
-  if (m.satz1) parts.push(m.satz1);
-  if (m.satz2) parts.push(m.satz2);
-  if (m.mtb) parts.push(m.mtb);
-  return parts.join(' · ');
-}
+  const mtb = parseSet(eff.mtb);
+  if (mtb) {
+    lines.push(scoreSet(mtb, isA, true));
+    const meine = isA ? mtb.a : mtb.b;
+    const fremde = isA ? mtb.b : mtb.a;
+    if (meine <= fremde) setsLost += 1;
+  }
 
-export function matchStatus(m: Match): 'gespielt' | 'terminiert' | 'offen' {
-  if (isMatchPlayed(m)) return 'gespielt';
-  if (m.termin) return 'terminiert';
-  return 'offen';
+  const bonus = won ? (setsLost === 0 ? 9 : 3) : 0;
+  const total = lines.reduce((sum, line) => sum + line.points, 0) + bonus;
+
+  return {
+    match,
+    opponent: (isA ? match.sideB : match.sideA) ?? '',
+    status,
+    result: formatResult(match),
+    won,
+    lines,
+    bonus,
+    total,
+  };
 }

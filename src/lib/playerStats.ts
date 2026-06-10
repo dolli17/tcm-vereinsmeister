@@ -1,262 +1,210 @@
+// Spielerstatistik über alle Konkurrenzen einer Saison. Gruppen-Konkurrenzen
+// liefern Tabelle + Punkteaufschlüsselung, KO-Konkurrenzen eine Match-Liste.
 import {
-  EINZEL_SPIELER,
-  DAMEN_EINZEL_SPIELER,
-  RAW_DOPPEL,
-  RAW_DAMEN_DOPPEL,
-  RAW_MIXED,
-  type Konkurrenz,
-  type Match,
-  type DoppelMatch,
-  type MixedMatch,
-} from './fixtures';
-import { getEinzelMatches, getDoppelMatches, getMixedMatches } from './results';
-import { computeStandings, formatResult, matchStatus } from './standings';
-
-export type { DoppelMatch, MixedMatch };
-
-export type PointLine = {
-  result: string;
-  label: string;
-  points: number;
-};
-
-export type MatchPointBreakdown = {
-  match: Match;
-  opponent: string;
-  status: 'gespielt' | 'terminiert' | 'offen';
-  result: string;
-  won: boolean;
-  lines: PointLine[];
-  bonus: number;
-  total: number;
-};
-
-const ALL_EINZEL_SPIELER = EINZEL_SPIELER;
-const ALL_DAMEN_EINZEL_SPIELER = DAMEN_EINZEL_SPIELER;
-
-function einzelKonkurrenzOf(name: string): Konkurrenz | null {
-  if (ALL_EINZEL_SPIELER.some((s) => s.name === name)) return 'herren';
-  if (ALL_DAMEN_EINZEL_SPIELER.some((s) => s.name === name)) return 'damen';
-  return null;
-}
-
-// Effektive Match-Daten (Fixtures + bestätigte DB-Ergebnisse).
-function einzelMatchesOf(konkurrenz: Konkurrenz | null): Match[] {
-  if (konkurrenz === 'damen') return getEinzelMatches('damen');
-  if (konkurrenz === 'herren') return getEinzelMatches('herren');
-  return [...getEinzelMatches('herren'), ...getEinzelMatches('damen')];
-}
-
-function allDoppelMatches(): DoppelMatch[] {
-  return [...getDoppelMatches('doppel'), ...getDoppelMatches('damen-doppel')];
-}
-
-function parseSet(set: string | null): { a: number; b: number } | null {
-  if (!set) return null;
-  const m = set.match(/^(\d+)[:\-](\d+)$/);
-  if (!m) return null;
-  return { a: parseInt(m[1], 10), b: parseInt(m[2], 10) };
-}
-
-function scoreSet(set: { a: number; b: number }, isA: boolean, isMtb: boolean): PointLine {
-  const meine = isA ? set.a : set.b;
-  const fremde = isA ? set.b : set.a;
-  const gewonnen = meine > fremde;
-  const winnerGames = Math.max(set.a, set.b);
-  const loserGames = Math.min(set.a, set.b);
-  const result = `${meine}:${fremde}`;
-
-  if (isMtb) {
-    return {
-      result,
-      label: gewonnen ? 'Match-Tiebreak gewonnen' : 'Match-Tiebreak verloren',
-      points: gewonnen ? 5 : 3,
-    };
-  }
-  if (winnerGames === 6 && loserGames === 0) {
-    return { result, label: gewonnen ? '6:0 gewonnen' : '6:0 verloren', points: gewonnen ? 8 : 0 };
-  }
-  if (winnerGames === 6 && loserGames >= 1 && loserGames <= 4) {
-    return { result, label: gewonnen ? 'Satz gewonnen' : 'Satz verloren', points: gewonnen ? 7 : 0 };
-  }
-  if (winnerGames === 7 && loserGames === 5) {
-    return { result, label: gewonnen ? 'Verlaengerter Satz gewonnen' : 'Verlaengerter Satz verloren', points: gewonnen ? 6 : 1 };
-  }
-  if (winnerGames === 7 && loserGames === 6) {
-    return { result, label: gewonnen ? 'Tiebreak gewonnen' : 'Tiebreak verloren', points: gewonnen ? 4 : 2 };
-  }
-  return { result, label: 'Nicht gewertetes Satzformat', points: 0 };
-}
+  getActiveSeason,
+  getCompetitions,
+  getCompetitionPlayers,
+  getEnrichedMatches,
+  isPlayed,
+  isPlaceholderName,
+  teamPlayers,
+  type Competition,
+  type EnrichedMatch,
+  type Season,
+} from './tournament';
+import { getDb } from './db';
+import {
+  computeStandings,
+  explainMatchPoints,
+  formatResult,
+  type MatchPointBreakdown,
+  type StandingRow,
+} from './standings';
 
 export function slugifyPlayer(name: string): string {
   return name
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
 }
 
-function teamPlayers(team: string | null): string[] {
-  if (!team || team === 'BYE') return [];
-  return team.split('/').map((p) => p.trim());
-}
-
-// Mixed-Doppel-Slots in späteren Runden enthalten Platzhalter wie
-// "Sieger Match 1" oder "Sieger Viertelfinale 2" bis ein Ergebnis feststeht.
-// Diese sollen nicht als Spielernamen behandelt werden.
-function isPlaceholderName(name: string): boolean {
-  return /^Sieger\s/i.test(name);
-}
-
+// Alle bekannten Spielernamen (globaler Stamm) für Suche/Slug-Auflösung.
 export function getAllPlayerNames(): string[] {
-  // Namen sind statisch (unabhängig vom Ergebnis) → direkt aus den Fixtures.
-  const doppelSpieler = [...RAW_DOPPEL, ...RAW_DAMEN_DOPPEL].flatMap((m) => [...teamPlayers(m.doppelA), ...teamPlayers(m.doppelB)]);
-  const mixedSpieler = RAW_MIXED.flatMap((m) => [...teamPlayers(m.teamA), ...teamPlayers(m.teamB)]);
-  return Array.from(
-    new Set([
-      ...ALL_EINZEL_SPIELER.map((s) => s.name),
-      ...ALL_DAMEN_EINZEL_SPIELER.map((s) => s.name),
-      ...doppelSpieler,
-      ...mixedSpieler,
-    ]),
-  )
-    .filter((n) => !isPlaceholderName(n))
-    .sort((a, b) => a.localeCompare(b, 'de'));
+  const rows = getDb().prepare('SELECT name FROM players ORDER BY name COLLATE NOCASE').all() as { name: string }[];
+  return rows.map((r) => r.name).filter((n) => !isPlaceholderName(n));
 }
 
 export function getPlayerBySlug(slug: string): string | undefined {
   return getAllPlayerNames().find((name) => slugifyPlayer(name) === slug);
 }
 
-export function getPlayerEinzelMatches(name: string): Match[] {
-  const konkurrenz = einzelKonkurrenzOf(name);
-  return einzelMatchesOf(konkurrenz)
-    .filter((m) => m.spielerA === name || m.spielerB === name)
-    .sort((a, b) => a.gruppe - b.gruppe || a.nr - b.nr);
-}
+export type TeamMatchView = {
+  runde: string | null;
+  nr: number;
+  team: string;
+  partner: string;
+  opponent: string;
+  termin: string | null;
+  result: string;
+  status: 'Gespielt' | 'Terminiert' | 'Offen' | 'Freilos';
+};
 
-export function getPlayerDoppelMatches(name: string): DoppelMatch[] {
-  return allDoppelMatches().filter((m) => [...teamPlayers(m.doppelA), ...teamPlayers(m.doppelB)].includes(name)).sort((a, b) => a.nr - b.nr);
-}
+export type CompetitionStat = {
+  competition: Competition;
+  gruppe: number | null;
+  standing: StandingRow | null;
+  breakdowns: MatchPointBreakdown[];
+  teamMatches: TeamMatchView[];
+  gespielt: number;
+  total: number;
+};
 
-export function getPlayerMixedMatches(name: string): MixedMatch[] {
-  return getMixedMatches().filter((m) => [...teamPlayers(m.teamA), ...teamPlayers(m.teamB)].includes(name));
-}
-
-export function explainMatchPoints(match: Match, name: string): MatchPointBreakdown | null {
-  const isA = match.spielerA === name;
-  const isB = match.spielerB === name;
-  if (!isA && !isB) return null;
-
-  const status = matchStatus(match);
-  const won = match.sieger === (isA ? 'A' : 'B');
-  const lines: PointLine[] = [];
-  let setsWon = 0;
-  let setsLost = 0;
-
-  for (const setStr of [match.satz1, match.satz2]) {
-    const set = parseSet(setStr);
-    if (!set) continue;
-    lines.push(scoreSet(set, isA, false));
-    const meine = isA ? set.a : set.b;
-    const fremde = isA ? set.b : set.a;
-    if (meine > fremde) setsWon += 1;
-    else setsLost += 1;
-  }
-
-  const mtb = parseSet(match.mtb);
-  if (mtb) {
-    lines.push(scoreSet(mtb, isA, true));
-    const meine = isA ? mtb.a : mtb.b;
-    const fremde = isA ? mtb.b : mtb.a;
-    if (meine > fremde) setsWon += 1;
-    else setsLost += 1;
-  }
-
-  const bonus = won ? (setsLost === 0 ? 9 : 3) : 0;
-  const total = lines.reduce((sum, line) => sum + line.points, 0) + bonus;
-
+function teamView(m: EnrichedMatch, name: string): TeamMatchView {
+  const a = teamPlayers(m.sideA);
+  const b = teamPlayers(m.sideB);
+  const inA = a.includes(name);
+  const own = inA ? a : b;
+  const other = inA ? b : a;
+  const isBye = other.length === 0;
+  const result = formatResult(m);
+  const status: TeamMatchView['status'] = isBye
+    ? 'Freilos'
+    : isPlayed(m)
+      ? 'Gespielt'
+      : m.termin
+        ? 'Terminiert'
+        : 'Offen';
   return {
-    match,
-    opponent: isA ? match.spielerB : match.spielerA,
+    runde: m.runde,
+    nr: m.nr,
+    team: own.join(' / '),
+    partner: own.find((p) => p !== name) ?? 'ohne Partner',
+    opponent: isBye ? 'Freilos' : other.join(' / '),
+    termin: m.termin,
+    result,
     status,
-    result: formatResult(match),
-    won,
-    lines,
-    bonus,
-    total,
   };
 }
 
-export function getPlayerStats(name: string) {
-  const konkurrenz = einzelKonkurrenzOf(name);
-  const einzel =
-    konkurrenz === 'damen'
-      ? ALL_DAMEN_EINZEL_SPIELER.find((s) => s.name === name)
-      : ALL_EINZEL_SPIELER.find((s) => s.name === name);
-  const standing =
-    einzel && konkurrenz
-      ? computeStandings(einzel.gruppe, konkurrenz).find((row) => row.name === name)
-      : undefined;
-  const einzelMatches = getPlayerEinzelMatches(name);
-  const doppelMatches = getPlayerDoppelMatches(name);
-  const mixedMatches = getPlayerMixedMatches(name);
-  const breakdowns = einzelMatches.map((m) => explainMatchPoints(m, name)).filter((m): m is MatchPointBreakdown => Boolean(m));
-  const playedBreakdowns = breakdowns.filter((m) => m.status === 'gespielt');
-  const doppelPlayed = doppelMatches.filter((m) => m.sieger === 'A' || m.sieger === 'B');
-  const mixedPlayed = mixedMatches.filter((m) => m.sieger === 'A' || m.sieger === 'B');
-  const mixedBye = mixedMatches.filter((m) => m.teamB === 'BYE');
+export type PlayerStats = {
+  name: string;
+  slug: string;
+  season: Season | null;
+  competitions: CompetitionStat[];
+  totals: { punkte: number; gespielt: number; total: number };
+};
 
-  return {
-    name,
-    slug: slugifyPlayer(name),
-    einzel,
-    standing,
-    einzelMatches,
-    doppelMatches,
-    mixedMatches,
-    breakdowns,
-    playedBreakdowns,
-    totals: {
-      einzelOffen: breakdowns.filter((m) => m.status === 'offen').length,
-      einzelTerminiert: breakdowns.filter((m) => m.status === 'terminiert').length,
-      einzelGespielt: playedBreakdowns.length,
-      einzelPunkteAusSaetzen: playedBreakdowns.reduce((sum, m) => sum + m.lines.reduce((inner, line) => inner + line.points, 0), 0),
-      einzelBonus: playedBreakdowns.reduce((sum, m) => sum + m.bonus, 0),
-      doppelGespielt: doppelPlayed.length,
-      doppelOffen: doppelMatches.length - doppelPlayed.length,
-      mixedGespielt: mixedPlayed.length,
-      mixedOffen: mixedMatches.length - mixedPlayed.length - mixedBye.length,
-      mixedBye: mixedBye.length,
-    },
-  };
+export function getPlayerStats(name: string, seasonId?: number): PlayerStats {
+  const season = seasonId != null ? getActiveSeasonOrId(seasonId) : getActiveSeason();
+  const competitions: CompetitionStat[] = [];
+  let punkte = 0;
+  let gespielt = 0;
+  let total = 0;
+
+  if (season) {
+    for (const comp of getCompetitions(season.id)) {
+      const matches = getEnrichedMatches(comp.id).filter(
+        (m) => teamPlayers(m.sideA).includes(name) || teamPlayers(m.sideB).includes(name),
+      );
+      if (matches.length === 0) continue;
+
+      const playable = matches.filter((m) => teamPlayers(m.sideA).length > 0 && teamPlayers(m.sideB).length > 0);
+      const played = playable.filter((m) => isPlayed(m)).length;
+      gespielt += played;
+      total += playable.length;
+
+      if (comp.modus === 'gruppe') {
+        const cp = getCompetitionPlayers(comp.id).find((p) => p.player_name === name);
+        const gruppe = cp?.gruppe ?? matches.find((m) => m.gruppe != null)?.gruppe ?? null;
+        const standing = gruppe != null ? computeStandings(comp.id, gruppe).find((r) => r.name === name) ?? null : null;
+        if (standing) punkte += standing.punkte;
+        const breakdowns = matches
+          .map((m) => explainMatchPoints(m, name))
+          .filter((b): b is MatchPointBreakdown => Boolean(b));
+        competitions.push({ competition: comp, gruppe, standing, breakdowns, teamMatches: [], gespielt: played, total: playable.length });
+      } else {
+        const teamMatches = matches.map((m) => teamView(m, name));
+        competitions.push({ competition: comp, gruppe: null, standing: null, breakdowns: [], teamMatches, gespielt: played, total: playable.length });
+      }
+    }
+  }
+
+  return { name, slug: slugifyPlayer(name), season, competitions, totals: { punkte, gespielt, total } };
 }
 
-export function getDoppelTeam(match: DoppelMatch, name: string): { partner: string; opponent: string; team: string } {
-  const teamA = teamPlayers(match.doppelA);
-  const teamB = teamPlayers(match.doppelB);
-  const inA = teamA.includes(name);
-  const ownTeam = inA ? teamA : teamB;
-  const otherTeam = inA ? teamB : teamA;
-
-  return {
-    team: ownTeam.join(' / '),
-    partner: ownTeam.find((p) => p !== name) ?? 'ohne Partner',
-    opponent: otherTeam.length > 0 ? otherTeam.join(' / ') : 'Freilos',
-  };
+function getActiveSeasonOrId(seasonId: number): Season | null {
+  const db = getDb();
+  return (db.prepare('SELECT * FROM seasons WHERE id = ?').get(seasonId) as Season | undefined) ?? null;
 }
 
-export function getMixedTeam(match: MixedMatch, name: string): { partner: string; opponent: string; team: string } {
-  const teamA = teamPlayers(match.teamA);
-  const teamB = teamPlayers(match.teamB);
-  const inA = teamA.includes(name);
-  const ownTeam = inA ? teamA : teamB;
-  const otherTeam = inA ? teamB : teamA;
+// ── Karriere über alle Saisons (bestätigte VM-Spiele) ───────────────────────
+export type CareerStats = {
+  gespielt: number;
+  siege: number;
+  // Formkurve: letzte 10 Ergebnisse, neuestes zuerst (true = Sieg).
+  form: boolean[];
+  seasons: { jahr: number; gespielt: number; siege: number }[];
+  gegner: { name: string; spiele: number; siege: number }[];
+};
+
+export function getPlayerCareer(name: string): CareerStats {
+  const rows = getDb()
+    .prepare(
+      `SELECT r.sieger, m.side_a, m.side_b, s.jahr
+       FROM results r
+       JOIN matches m ON m.id = r.match_id
+       JOIN competitions c ON c.id = m.competition_id
+       JOIN seasons s ON s.id = c.season_id
+       WHERE r.status = 'confirmed' AND r.match_id IS NOT NULL
+       ORDER BY COALESCE(r.decided_at, r.created_at), r.id`,
+    )
+    .all() as { sieger: 'A' | 'B'; side_a: string | null; side_b: string | null; jahr: number }[];
+
+  let gespielt = 0;
+  let siege = 0;
+  const results: boolean[] = [];
+  const bySeason = new Map<number, { gespielt: number; siege: number }>();
+  const byOpponent = new Map<string, { spiele: number; siege: number }>();
+
+  for (const r of rows) {
+    const a = teamPlayers(r.side_a);
+    const b = teamPlayers(r.side_b);
+    const inA = a.includes(name);
+    const inB = b.includes(name);
+    if (!inA && !inB) continue;
+    const won = r.sieger === (inA ? 'A' : 'B');
+    const opponents = inA ? b : a;
+    if (opponents.length === 0) continue;
+
+    gespielt++;
+    if (won) siege++;
+    results.push(won);
+
+    const season = bySeason.get(r.jahr) ?? { gespielt: 0, siege: 0 };
+    season.gespielt++;
+    if (won) season.siege++;
+    bySeason.set(r.jahr, season);
+
+    for (const opp of opponents) {
+      const o = byOpponent.get(opp) ?? { spiele: 0, siege: 0 };
+      o.spiele++;
+      if (won) o.siege++;
+      byOpponent.set(opp, o);
+    }
+  }
 
   return {
-    team: ownTeam.join(' / '),
-    partner: ownTeam.find((p) => p !== name) ?? 'ohne Partner',
-    opponent: otherTeam.length > 0 ? otherTeam.join(' / ') : 'Freilos',
+    gespielt,
+    siege,
+    form: results.slice(-10).reverse(),
+    seasons: Array.from(bySeason.entries())
+      .map(([jahr, v]) => ({ jahr, ...v }))
+      .sort((x, y) => y.jahr - x.jahr),
+    gegner: Array.from(byOpponent.entries())
+      .map(([n, v]) => ({ name: n, ...v }))
+      .sort((x, y) => y.spiele - x.spiele || x.name.localeCompare(y.name, 'de'))
+      .slice(0, 5),
   };
 }

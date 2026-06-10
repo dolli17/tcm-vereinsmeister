@@ -1,227 +1,291 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import AppShell from '../components/AppShell.astro';
+import { getActiveSeason, listSeasons } from '../lib/tournament';
 import { getPlayerMatches, type PlayerMatch } from '../lib/matchEntry';
+import { getAllPlayerNames, slugifyPlayer } from '../lib/playerStats';
+import { getPhoneMap } from '../lib/players';
+import { formatTermin, getPendingProposals, type TerminProposal } from '../lib/termine';
 
 const user = Astro.locals.user;
-if (!user) return Astro.redirect('/login');
+const season = getActiveSeason();
+const seasons = listSeasons();
+const approved = !!user && !!user.player_name && user.claim_status === 'approved';
 
-const approved = !!user.player_name && user.claim_status === 'approved';
-const matches: PlayerMatch[] = approved ? getPlayerMatches(user.player_name!, user.id) : [];
+let matches: PlayerMatch[] = [];
+if (approved && user?.player_name) {
+  matches = getPlayerMatches(user.player_name, user.id);
+  const prio = (m: PlayerMatch) => (m.canDecide ? 0 : m.isBye || m.gegnerOffen ? 5 : { rejected: 1, open: 2, pending: 3, confirmed: 4 }[m.status]);
+  matches.sort((a, b) => prio(a) - prio(b) || a.wettbewerbLabel.localeCompare(b.wettbewerbLabel, 'de'));
+}
 
-// Zu bestätigende zuerst, dann offene, dann der Rest.
-const prio = (m: PlayerMatch) => (m.canDecide ? 0 : m.isBye ? 5 : { rejected: 1, open: 2, pending: 3, confirmed: 4 }[m.status]);
-matches.sort((a, b) => prio(a) - prio(b) || a.wettbewerbLabel.localeCompare(b.wettbewerbLabel, 'de'));
+// Offene Terminvorschläge je Match.
+const proposals: Map<number, TerminProposal> = approved ? getPendingProposals() : new Map();
+
+// Kontakt zum Gegner (Terminabsprache): Telefonnummern aus dem Spielerstamm.
+const phones = approved ? getPhoneMap() : {};
+const telDigits = (tel: string) => tel.replace(/[^\d+]/g, '');
+const waLink = (tel: string) => {
+  const d = telDigits(tel);
+  const intl = d.startsWith('+') ? d.slice(1) : d.startsWith('00') ? d.slice(2) : d.startsWith('0') ? `49${d.slice(1)}` : d;
+  return `https://wa.me/${intl}`;
+};
+
+// Suche (ausgeloggt)
+const players = !user ? getAllPlayerNames().map((n) => ({ name: n, slug: slugifyPlayer(n) })) : [];
 
 const params = Astro.url.searchParams;
 const entered = params.get('entered') === '1';
+const terminMsg =
+  params.get('termin') === 'proposed' ? 'Terminvorschlag verschickt — dein Gegner bestätigt ihn hier.' :
+  params.get('termin') === 'accepted' ? 'Termin bestätigt! Er steht jetzt am Spiel.' :
+  params.get('termin') === 'declined' ? 'Terminvorschlag abgelehnt — der Vorschlagende wurde informiert.' : null;
 const decided = params.get('decided');
 const decidedMsg = decided === 'accepted' ? 'Ergebnis bestätigt — es zählt jetzt für die Tabelle.' : decided === 'rejected' ? 'Ergebnis abgelehnt. Der Sportwart wurde informiert.' : null;
 const error = params.get('error');
 const errorMsg =
-  error === 'score' ? 'Das Ergebnis konnte nicht gelesen werden. Bitte Sätze prüfen (z. B. 6:3).' :
+  error === 'score' ? 'Das Ergebnis konnte nicht gelesen werden (z. B. 6:3).' :
   error === 'exists' ? 'Für dieses Spiel liegt bereits ein Ergebnis vor.' :
-  error === 'inreview' ? 'Diese Partie wird gerade vom Admin geklärt und kann nicht erneut eingetragen werden.' :
+  error === 'inreview' ? 'Diese Partie wird gerade vom Admin geklärt.' :
   error === 'notyours' ? 'Dieses Spiel gehört nicht zu dir.' :
   error === 'notapproved' ? 'Dein Namensanspruch ist noch nicht freigegeben.' :
   error === 'ownresult' ? 'Dein eigenes Ergebnis kann nur der Gegner bestätigen.' :
   error === 'gone' ? 'Dieses Ergebnis wurde bereits bearbeitet.' :
   error === 'conflict' ? 'Für dieses Spiel liegt bereits ein bestätigtes Ergebnis vor.' :
   error === 'fixture' ? 'Spiel nicht gefunden.' :
+  error === 'archived' ? 'Diese Saison ist archiviert — Ergebnisse können nicht mehr geändert werden.' :
+  error === 'termin' ? 'Bitte einen gültigen Termin (Datum + Uhrzeit) wählen.' :
   error ? 'Es ist ein Fehler aufgetreten.' : null;
 
 const ctxLabel = (m: PlayerMatch) => m.runde ?? (m.gruppe != null ? `Gruppe ${m.gruppe}` : '');
-const statusBadge: Record<PlayerMatch['status'], { text: string; cls: string }> = {
-  open: { text: 'offen', cls: 'badge-open' },
-  pending: { text: 'wartet auf Bestätigung', cls: 'badge-pending' },
-  confirmed: { text: 'bestätigt', cls: 'badge-confirmed' },
-  rejected: { text: 'in Klärung beim Admin', cls: 'badge-rejected' },
+const statusInfo: Record<PlayerMatch['status'], { text: string; cls: string }> = {
+  open: { text: 'offen', cls: 'open' },
+  pending: { text: 'wartet auf Bestätigung', cls: 'done' },
+  confirmed: { text: 'bestätigt', cls: 'done' },
+  rejected: { text: 'in Klärung', cls: 'done' },
 };
 ---
 
-<Layout title="Meine Spiele · Vereinsmeisterschaft">
-  <div class="border-b border-deep-ink/10 bg-warm-sand-2/40">
-    <div class="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-2">
-      <a href="/" class="auth-nav-link">← Übersicht</a>
-      <div class="flex items-center gap-4">
-        <a href="/einstellungen" class="auth-nav-link">Einstellungen</a>
-        <form method="POST" action="/api/auth/logout"><button type="submit" class="auth-nav-link">Abmelden</button></form>
+<AppShell active="me" season={season} seasons={seasons} title="Meine Spiele · Vereinsmeisterschaft">
+  <div class="section-title">Meine Spiele</div>
+
+  {!user ? (
+    <>
+      <div class="section-sub">Such deinen Namen und sieh all deine Partien.</div>
+      <div class="search-wrap">
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+          <input id="vm-search" type="text" placeholder="Name eingeben…" autocomplete="off" />
+          <button class="clr" id="vm-clear" hidden>✕</button>
+        </div>
       </div>
-    </div>
-  </div>
-
-  <main class="mx-auto max-w-3xl px-4 py-8">
-    <div class="label-mono text-club-blue">Mein Bereich</div>
-    <h1 class="mt-1 font-serif text-4xl leading-tight text-deep-ink">Meine Spiele</h1>
-    <p class="mt-2 text-[15px] text-muted">
-      Angemeldet als {user.email}{user.player_name ? ` · ${user.player_name}` : ''}
-    </p>
-
-    {entered && (
-      <div class="mt-5 rounded-sm border border-club-blue/30 bg-club-blue/5 px-4 py-3 text-[15px] text-deep-ink">
-        Ergebnis eingetragen! Dein Gegner wurde per E-Mail informiert und bestätigt es hier in der App.
+      <div class="suggest" id="vm-suggest"></div>
+      <div class="empty" id="vm-hint">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+        <div class="t">Spieler suchen</div>
+        <div class="d">Tippe einen Namen, um den persönlichen Spielplan zu sehen.</div>
       </div>
-    )}
-    {decidedMsg && (
-      <div class="mt-5 rounded-sm border border-club-blue/30 bg-club-blue/5 px-4 py-3 text-[15px] text-deep-ink">{decidedMsg}</div>
-    )}
-    {errorMsg && (
-      <div class="mt-5 rounded-sm border border-court-red/30 bg-court-red/5 px-4 py-3 text-[15px] text-deep-ink">
-        {errorMsg}
-      </div>
-    )}
+      <p class="section-sub" style="text-align:center;padding-top:14px">Eingeloggt siehst du hier direkt deine eigenen Spiele. <a href="/login" style="color:var(--accent);font-weight:700">Anmelden</a></p>
+    </>
+  ) : (
+    <>
+      <div class="section-sub">Angemeldet als {user.email}{user.player_name ? ` · ${user.player_name}` : ''}</div>
+      <div class="section">
+        {entered && <div class="notice ok">Ergebnis eingetragen! Dein Gegner wurde informiert und bestätigt es hier.</div>}
+        {terminMsg && <div class="notice ok">{terminMsg}</div>}
+        {decidedMsg && <div class="notice ok">{decidedMsg}</div>}
+        {errorMsg && <div class="notice err">{errorMsg}</div>}
 
-    {!user.player_name && (
-      <div class="mt-5 rounded-sm border border-court-red/30 bg-court-red/5 px-4 py-3 text-[15px] text-deep-ink">
-        Du hast noch keinen Namen beansprucht. Bitte <a class="text-club-blue underline" href="/registrieren">wähle deinen Namen</a>.
-      </div>
-    )}
-    {user.player_name && user.claim_status === 'pending' && (
-      <div class="mt-5 rounded-sm border border-court-red/30 bg-court-red/5 px-4 py-3 text-[15px] text-deep-ink">
-        Dein Namensanspruch <strong>{user.player_name}</strong> wartet auf die Freigabe durch den Admin.
-        Sobald er freigegeben ist, kannst du Ergebnisse eintragen.
-      </div>
-    )}
-    {user.player_name && user.claim_status === 'rejected' && (
-      <div class="mt-5 rounded-sm border border-court-red/30 bg-court-red/5 px-4 py-3 text-[15px] text-deep-ink">
-        Dein Namensanspruch wurde abgelehnt. Bitte kontaktiere den Sportwart.
-      </div>
-    )}
+        {!user.player_name && (
+          <div class="notice err">Du hast noch keinen Namen beansprucht. Bitte <a href="/registrieren" style="color:var(--accent);font-weight:700">wähle deinen Namen</a>.</div>
+        )}
+        {user.player_name && user.claim_status === 'pending' && (
+          <div class="notice err">Dein Namensanspruch <b>{user.player_name}</b> wartet auf die Freigabe durch den Admin.</div>
+        )}
+        {user.player_name && user.claim_status === 'rejected' && (
+          <div class="notice err">Dein Namensanspruch wurde abgelehnt. Bitte kontaktiere den Sportwart.</div>
+        )}
 
-    {approved && matches.length === 0 && (
-      <p class="mt-8 text-muted">Für dich sind aktuell keine Spiele hinterlegt.</p>
-    )}
+        {approved && !!season?.anmeldung_offen && (
+          <div class="notice ok">Das Meldefenster für die {season.name} ist offen! <a href="/anmeldung" style="color:var(--accent);font-weight:700">Jetzt anmelden</a></div>
+        )}
 
-    {approved && (
-      <div class="mt-6 grid gap-3">
-        {matches.map((m) => (
-          <article class="rounded-sm border border-deep-ink/12 bg-white/55 p-4">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <div class="label-mono text-club-blue">{m.wettbewerbLabel}</div>
-                <div class="mt-0.5 font-mono text-[11px] text-muted-2">{ctxLabel(m)} · Match {String(m.nr).padStart(2, '0')}</div>
-              </div>
-              {m.isBye
-                ? <span class="status-badge badge-bye">Freilos</span>
-                : <span class={`status-badge ${statusBadge[m.status].cls}`}>{statusBadge[m.status].text}</span>}
-            </div>
+        {approved && matches.length === 0 && <p class="section-sub" style="padding-left:0">Für dich sind aktuell keine Spiele hinterlegt.</p>}
 
-            <div class="mt-2 text-[15px] text-deep-ink">
-              {m.sideA.length ? m.sideA.join(' / ') : 'Freilos'} <span class="text-muted-2">vs</span> {m.sideB.length ? m.sideB.join(' / ') : 'Freilos'}
-            </div>
-            <div class="mt-0.5 text-sm text-muted">
-              {m.isBye ? 'Freilos' : `Gegner: ${m.gegner.join(' / ')}`}{m.partner.length > 0 ? ` · Partner: ${m.partner.join(' / ')}` : ''}
-            </div>
+        {approved && (
+          <div style="display:flex;flex-direction:column;gap:12px">
+            {matches.map((m) => (
+              <div class="card" style="padding:14px 16px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+                  <span class="status-tag done" style="background:var(--accent-soft);color:var(--accent)">{m.wettbewerbLabel}</span>
+                  <span style="font-size:.72rem;color:var(--muted)">{ctxLabel(m)} · #{String(m.nr).padStart(2, '0')}</span>
+                  <span style="margin-left:auto" class={`status-tag ${m.isBye || m.gegnerOffen ? 'done' : statusInfo[m.status].cls}`}>{m.isBye ? 'Freilos' : m.gegnerOffen ? 'Gegner offen' : statusInfo[m.status].text}</span>
+                </div>
 
-            {m.isBye && (
-              <div class="mt-1 text-sm text-muted">Freilos — kein Ergebnis nötig, du bist ohne Spiel eine Runde weiter.</div>
-            )}
+                <div class="match-side" style="padding:0">
+                  <span class="nm" style="font-size:1rem;font-weight:700">{m.sideA.length ? m.sideA.join(' / ') : m.gegnerOffen ? 'Noch offen' : 'Freilos'} <span style="color:var(--muted);font-weight:600">vs</span> {m.sideB.length ? m.sideB.join(' / ') : m.gegnerOffen ? 'Noch offen' : 'Freilos'}</span>
+                </div>
+                <div style="font-size:.78rem;color:var(--muted);margin-top:3px">
+                  {m.isBye ? 'Freilos — kein Ergebnis nötig.' : m.gegnerOffen ? 'Der Gegner steht noch nicht fest (vorherige Runde offen).' : `Gegner: ${m.gegner.join(' / ')}`}{m.partner.length > 0 ? ` · Partner: ${m.partner.join(' / ')}` : ''}
+                </div>
 
-            {(m.status === 'confirmed' || m.status === 'pending') && m.result && (
-              <div class="mt-2 font-mono text-[13px] text-deep-ink">
-                {m.result}
-                {m.ichGewonnen != null && (
-                  <span class={m.ichGewonnen ? 'text-[#1f7a4d]' : 'text-court-red'}> · {m.ichGewonnen ? 'gewonnen' : 'verloren'}</span>
+                {(m.status === 'confirmed' || m.status === 'pending') && m.result && (
+                  <div style="margin-top:8px" class="score">{m.result}{m.ichGewonnen != null ? (m.ichGewonnen ? ' · gewonnen' : ' · verloren') : ''}</div>
+                )}
+                {m.status === 'pending' && m.submittedByMe && (
+                  <div style="font-size:.8rem;color:var(--muted);margin-top:6px">Du hast eingetragen — warte auf Bestätigung des Gegners.</div>
+                )}
+                {m.status === 'rejected' && (
+                  <div style="font-size:.8rem;color:var(--danger);margin-top:6px">Abgelehnt{m.rejectReason ? `: ${m.rejectReason}` : ''}. Der Sportwart klärt das.</div>
+                )}
+
+                {/* Terminvereinbarung: bestätigter Termin, offener Vorschlag oder neues Vorschlagsformular */}
+                {m.status === 'open' && !m.isBye && !m.gegnerOffen && (() => {
+                  const p = proposals.get(m.matchId);
+                  const iAmProposer = p?.proposed_by === user.id;
+                  return (
+                    <div style="margin-top:8px;padding:8px 10px;border:1px dashed var(--line);border-radius:8px">
+                      {m.termin && (
+                        <div style="font-size:.8rem;margin-bottom:6px">
+                          📅 <b>Termin:</b> {formatTermin(m.termin)}
+                          <a href={`/api/termin-ics?match_id=${m.matchId}`} style="margin-left:8px;color:var(--accent);font-weight:700">In Kalender (ICS)</a>
+                        </div>
+                      )}
+                      {p && iAmProposer && (
+                        <div style="font-size:.8rem;color:var(--muted)">Dein Terminvorschlag <b>{formatTermin(p.termin)}</b> wartet auf Bestätigung des Gegners.</div>
+                      )}
+                      {p && !iAmProposer && (
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                          <span style="font-size:.8rem">{p.proposer_name ?? 'Gegner'} schlägt vor: <b>{formatTermin(p.termin)}</b></span>
+                          <form method="POST" action="/api/termin"><input type="hidden" name="action" value="decide" /><input type="hidden" name="proposal_id" value={p.id} /><input type="hidden" name="decision" value="accept" /><button class="btn sm lime">Passt</button></form>
+                          <form method="POST" action="/api/termin"><input type="hidden" name="action" value="decide" /><input type="hidden" name="proposal_id" value={p.id} /><input type="hidden" name="decision" value="decline" /><button class="btn sm ghost">Passt nicht</button></form>
+                        </div>
+                      )}
+                      {!p && (
+                        <form method="POST" action="/api/termin" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+                          <input type="hidden" name="action" value="propose" />
+                          <input type="hidden" name="match_id" value={m.matchId} />
+                          <label style="display:block"><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">{m.termin ? 'Neuen Termin vorschlagen' : 'Termin vorschlagen'}</span><input class="input" style="min-height:36px" type="datetime-local" name="termin" required /></label>
+                          <button type="submit" class="btn sm ghost">Vorschlagen</button>
+                        </form>
+                      )}
+                    </div>
+                  );
+                })()}
+                {m.status === 'open' && !m.isBye && !m.gegnerOffen && m.gegner.some((g) => phones[g]) && (
+                  <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center">
+                    {m.gegner.filter((g) => phones[g]).map((g) => (
+                      <>
+                        <a class="btn sm ghost" href={waLink(phones[g])} target="_blank" rel="noopener">💬 WhatsApp{m.gegner.length > 1 ? ` ${g.split(' ')[0]}` : ''}</a>
+                        <a class="btn sm ghost" href={`tel:${telDigits(phones[g])}`}>📞 Anrufen{m.gegner.length > 1 ? ` ${g.split(' ')[0]}` : ''}</a>
+                      </>
+                    ))}
+                  </div>
+                )}
+                {m.canEnter && (
+                  <form method="POST" action="/api/results" style="margin-top:10px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap" data-entry>
+                    <input type="hidden" name="match_id" value={m.matchId} />
+                    <label style="display:block"><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">Typ</span>
+                      <select class="input" name="ergebnis_typ" style="min-height:36px" data-typ>
+                        <option value="gespielt">Gespielt</option>
+                        <option value="wo">Kampflos (w.o.)</option>
+                        <option value="aufgabe">Aufgabe</option>
+                      </select>
+                    </label>
+                    <label style="display:block" data-sets><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">Satz 1</span><input class="score-in" name="satz1" placeholder="6:3" inputmode="numeric" /></label>
+                    <label style="display:block" data-sets><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">Satz 2</span><input class="score-in" name="satz2" placeholder="6:4" inputmode="numeric" /></label>
+                    <label style="display:block" data-sets><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">MTB</span><input class="score-in" name="mtb" placeholder="10:7" inputmode="numeric" /></label>
+                    <label style="display:none" data-winner><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">Sieger</span>
+                      <select class="input" name="sieger_rel" style="min-height:36px">
+                        <option value="me">{m.partner.length > 0 ? 'Wir' : 'Ich'}</option>
+                        <option value="opp">{m.gegner.join(' / ')}</option>
+                      </select>
+                    </label>
+                    <button type="submit" class="btn sm">Eintragen</button>
+                  </form>
+                )}
+                {m.status === 'pending' && m.canDecide && (
+                  <div style="margin-top:10px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+                    <form method="POST" action="/api/results/decide">
+                      <input type="hidden" name="result_id" value={m.resultId} />
+                      <input type="hidden" name="action" value="accept" />
+                      <button type="submit" class="btn sm lime">Annehmen</button>
+                    </form>
+                    <form method="POST" action="/api/results/decide" style="display:flex;gap:8px;align-items:flex-end">
+                      <input type="hidden" name="result_id" value={m.resultId} />
+                      <input type="hidden" name="action" value="reject" />
+                      <label style="display:block"><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">Grund (optional)</span><input class="input" style="min-height:36px;min-width:140px" name="reason" placeholder="z. B. Satz 2 war 6:3" /></label>
+                      <button type="submit" class="btn sm danger">Ablehnen</button>
+                    </form>
+                  </div>
                 )}
               </div>
-            )}
-            {m.status === 'pending' && m.submittedByMe && (
-              <div class="mt-1 text-sm text-muted">Du hast dieses Ergebnis eingetragen — warte auf Bestätigung des Gegners.</div>
-            )}
-            {m.status === 'pending' && m.canDecide && (
-              <div class="mt-3 rounded-sm border border-deep-ink/10 bg-warm-sand-2/40 p-3">
-                <div class="text-sm text-deep-ink">Stimmt dieses Ergebnis? Bitte bestätige oder lehne ab.</div>
-                <div class="mt-2 flex flex-wrap items-end gap-2">
-                  <form method="POST" action="/api/results/decide">
-                    <input type="hidden" name="result_id" value={m.resultId} />
-                    <input type="hidden" name="action" value="accept" />
-                    <button type="submit" class="decide-btn accept">Annehmen</button>
-                  </form>
-                  <form method="POST" action="/api/results/decide" class="flex items-end gap-2">
-                    <input type="hidden" name="result_id" value={m.resultId} />
-                    <input type="hidden" name="action" value="reject" />
-                    <label class="block">
-                      <span class="label-mono mb-1 block text-muted-2">Grund (optional)</span>
-                      <input class="score-input !text-left" name="reason" placeholder="z. B. Satz 2 war 6:3" />
-                    </label>
-                    <button type="submit" class="decide-btn reject">Ablehnen</button>
-                  </form>
-                </div>
-              </div>
-            )}
-            {m.status === 'pending' && !m.submittedByMe && !m.canDecide && (
-              <div class="mt-1 text-sm text-muted">Wird vom Gegner geprüft.</div>
-            )}
-            {m.status === 'rejected' && (
-              <div class="mt-1 text-sm text-court-red">
-                Das eingetragene Ergebnis wurde abgelehnt{m.rejectReason ? `: ${m.rejectReason}` : ''}.
-                Die Partie wird jetzt vom Sportwart/Admin geklärt — ihr müsst nichts weiter tun.
-              </div>
-            )}
-
-            {m.canEnter && (
-              <form method="POST" action="/api/results" class="mt-3 grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
-                <input type="hidden" name="wettbewerb" value={m.wettbewerb} />
-                {m.gruppe != null && <input type="hidden" name="gruppe" value={m.gruppe} />}
-                {m.runde && <input type="hidden" name="runde" value={m.runde} />}
-                <input type="hidden" name="match_nr" value={m.nr} />
-                <label class="block">
-                  <span class="label-mono mb-1 block text-muted-2">Satz 1</span>
-                  <input class="score-input" name="satz1" required placeholder="6:3" inputmode="numeric" />
-                </label>
-                <label class="block">
-                  <span class="label-mono mb-1 block text-muted-2">Satz 2</span>
-                  <input class="score-input" name="satz2" required placeholder="6:4" inputmode="numeric" />
-                </label>
-                <label class="block">
-                  <span class="label-mono mb-1 block text-muted-2">MTB</span>
-                  <input class="score-input" name="mtb" placeholder="10:7" inputmode="numeric" />
-                </label>
-                <button type="submit" class="enter-button">Eintragen</button>
-              </form>
-            )}
-          </article>
-        ))}
+            ))}
+          </div>
+        )}
       </div>
-    )}
-  </main>
+    </>
+  )}
+</AppShell>
 
-  <style>
-    .auth-nav-link {
-      cursor: pointer; background: transparent; border: none;
-      font-family: var(--font-mono); font-size: 11px; font-weight: 500;
-      letter-spacing: 1.1px; text-transform: uppercase; color: var(--color-muted);
+{user && (
+  <script>
+    // Eintragungsformulare: bei Kampflos die Satz-Felder ausblenden, bei
+    // Kampflos/Aufgabe die Sieger-Auswahl einblenden.
+    document.querySelectorAll<HTMLFormElement>('[data-entry]').forEach((form) => {
+      const typ = form.querySelector<HTMLSelectElement>('[data-typ]');
+      if (!typ) return;
+      const apply = () => {
+        const t = typ.value;
+        form.querySelectorAll<HTMLElement>('[data-sets]').forEach((el) => { el.style.display = t === 'wo' ? 'none' : 'block'; });
+        form.querySelectorAll<HTMLElement>('[data-winner]').forEach((el) => { el.style.display = t === 'gespielt' ? 'none' : 'block'; });
+      };
+      typ.addEventListener('change', apply);
+      apply();
+    });
+  </script>
+)}
+
+{!user && (
+  <script define:vars={{ players }}>
+    const input = document.getElementById('vm-search');
+    const clr = document.getElementById('vm-clear');
+    const suggest = document.getElementById('vm-suggest');
+    const hint = document.getElementById('vm-hint');
+    const norm = (s) => s.trim().toLocaleLowerCase('de');
+    const initials = (n) => n.split(' ').filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+
+    // Namen sind Nutzereingaben — nur über textContent rendern, nie als HTML.
+    const el = (tag, cls, text) => {
+      const node = document.createElement(tag);
+      if (cls) node.className = cls;
+      if (text != null) node.textContent = text;
+      return node;
+    };
+
+    function render() {
+      const q = norm(input.value);
+      clr.hidden = !input.value;
+      suggest.replaceChildren();
+      if (!q) { hint.hidden = false; return; }
+      const hits = players.filter((p) => norm(p.name).includes(q)).slice(0, 14);
+      hint.hidden = true;
+      if (!hits.length) {
+        const empty = el('div', 'empty');
+        empty.append(el('div', 't', 'Nicht gefunden'), el('div', 'd', `Kein Spieler mit „${input.value}".`));
+        suggest.append(empty);
+        return;
+      }
+      for (const p of hits) {
+        const a = el('a', 'suggest-item');
+        a.href = `/spieler/${p.slug}`;
+        a.style.cssText = 'text-decoration:none;color:inherit';
+        const chev = el('span', 'chev');
+        chev.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M9 6l6 6-6 6"/></svg>';
+        a.append(el('span', 'avatar', initials(p.name)), el('span', 'nm', p.name), chev);
+        suggest.append(a);
+      }
     }
-    .auth-nav-link:hover { color: var(--color-deep-ink); }
-    .status-badge {
-      flex: 0 0 auto; border-radius: 999px; padding: 0.2rem 0.6rem;
-      font-family: var(--font-mono); font-size: 10px; font-weight: 500;
-      letter-spacing: 0.6px; text-transform: uppercase; white-space: nowrap;
-    }
-    .badge-open { background: rgba(26,31,46,0.08); color: var(--color-muted); }
-    .badge-pending { background: rgba(180,120,20,0.14); color: #8a5a10; }
-    .badge-confirmed { background: rgba(31,122,77,0.14); color: #1f7a4d; }
-    .badge-rejected { background: rgba(179,64,47,0.14); color: var(--color-court-red); }
-    .badge-bye { background: rgba(26,31,46,0.06); color: var(--color-muted-2); }
-    .score-input {
-      width: 100%; min-height: 42px; border: 1px solid rgba(26,31,46,0.18);
-      border-radius: 6px; padding: 0.5rem 0.6rem; font: inherit; font-family: var(--font-mono);
-      background: rgba(255,255,255,0.8); outline: none; text-align: center;
-    }
-    .score-input:focus { border-color: var(--color-deep-ink); }
-    .enter-button {
-      cursor: pointer; min-height: 42px; border-radius: 6px;
-      border: 1px solid var(--color-deep-ink); background: var(--color-deep-ink); color: #fff;
-      padding: 0 0.9rem; font-family: var(--font-mono); font-size: 11px; font-weight: 500;
-      letter-spacing: 1px; text-transform: uppercase;
-    }
-    .enter-button:active { transform: translateY(1px); }
-    .decide-btn {
-      cursor: pointer; min-height: 42px; border-radius: 6px; padding: 0 0.9rem; color: #fff;
-      border: 1px solid transparent; font-family: var(--font-mono); font-size: 11px; font-weight: 500;
-      letter-spacing: 1px; text-transform: uppercase;
-    }
-    .decide-btn.accept { background: #1f7a4d; border-color: #1f7a4d; }
-    .decide-btn.reject { background: #b3402f; border-color: #b3402f; }
-    .decide-btn:active { transform: translateY(1px); }
-  </style>
-</Layout>
+    input.addEventListener('input', render);
+    clr.addEventListener('click', () => { input.value = ''; render(); input.focus(); });
+  </script>
+)}

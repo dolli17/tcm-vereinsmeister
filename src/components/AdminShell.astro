@@ -1,0 +1,28 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+type Props = { title?: string; active?: 'dashboard' | 'spiele' | 'saison' | 'spieler' };
+const { title, active } = Astro.props;
+---
+
+<Layout title={title}>
+  <div class="admin">
+    <header class="admin-top">
+      <a class="admin-brand" href="/admin">
+        <img src="/tcm-logo.png" alt="TC Muckensturm" />
+        <b>Admin</b>
+      </a>
+      <nav class="admin-nav">
+        <a href="/admin" data-on={active === 'dashboard' ? '1' : '0'}>Dashboard</a>
+        <a href="/admin/spiele" data-on={active === 'spiele' ? '1' : '0'}>Spiele &amp; Ergebnisse</a>
+        <a href="/admin/saison" data-on={active === 'saison' ? '1' : '0'}>Saisons &amp; Konkurrenzen</a>
+        <a href="/admin/spieler" data-on={active === 'spieler' ? '1' : '0'}>Spieler</a>
+        <a href="/">↗ Zur Website</a>
+        <form method="POST" action="/api/auth/logout"><button type="submit">Abmelden</button></form>
+      </nav>
+    </header>
+    <main class="admin-main">
+      <slot />
+    </main>
+  </div>
+</Layout>

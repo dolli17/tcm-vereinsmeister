@@ -1,47 +1,53 @@
 import type { APIRoute } from 'astro';
 import { getDb } from '../../../lib/db';
-import { findFixture, type Wettbewerb } from '../../../lib/fixtures';
-import { validateScore } from '../../../lib/matchEntry';
-
-const WETTBEWERBE: Wettbewerb[] = ['herren', 'damen', 'doppel', 'damen-doppel', 'mixed'];
+import { findFixtureById, validateEntry } from '../../../lib/matchEntry';
+import { logAction } from '../../../lib/audit';
+import { syncBracketForMatch } from '../../../lib/tournament';
 
 export const POST: APIRoute = async ({ request, redirect, locals }) => {
   const admin = locals.user;
   if (admin?.role !== 'admin') return redirect('/login');
 
   const form = await request.formData();
-  const wettbewerb = String(form.get('wettbewerb') ?? '') as Wettbewerb;
-  const gruppeRaw = form.get('gruppe');
-  const runde = (form.get('runde') as string) || null;
-  const nr = parseInt(String(form.get('match_nr') ?? ''), 10);
-  const gruppe = gruppeRaw != null && gruppeRaw !== '' ? parseInt(String(gruppeRaw), 10) : null;
+  const matchId = parseInt(String(form.get('match_id') ?? ''), 10);
   const action = String(form.get('action') ?? 'save');
+  if (Number.isNaN(matchId)) return redirect('/admin/spiele?error=fixture');
 
-  if (!WETTBEWERBE.includes(wettbewerb) || Number.isNaN(nr)) return redirect('/admin/spiele?error=fixture');
-  const fixture = findFixture(wettbewerb, { gruppe, runde, nr });
+  const fixture = findFixtureById(matchId);
   if (!fixture) return redirect('/admin/spiele?error=fixture');
 
   const db = getDb();
-  const matchWhere = `wettbewerb = ? AND IFNULL(gruppe,-1) = IFNULL(?,-1) AND IFNULL(runde,'') = IFNULL(?,'') AND match_nr = ?`;
+
+  const matchLabel = `${fixture.wettbewerbLabel}: ${fixture.sideA.join(' / ')} vs ${fixture.sideB.join(' / ')}`;
 
   if (action === 'delete') {
-    db.prepare(`DELETE FROM results WHERE ${matchWhere}`).run(wettbewerb, gruppe, runde, nr);
+    db.prepare('DELETE FROM results WHERE match_id = ?').run(matchId);
+    syncBracketForMatch(matchId);
+    logAction(admin, 'ergebnis_geloescht', matchLabel);
     return redirect('/admin/spiele?ok=deleted');
   }
 
-  const valid = validateScore({ satz1: String(form.get('satz1') ?? ''), satz2: String(form.get('satz2') ?? ''), mtb: String(form.get('mtb') ?? '') });
+  const valid = validateEntry({
+    typ: String(form.get('ergebnis_typ') ?? 'gespielt'),
+    satz1: String(form.get('satz1') ?? ''),
+    satz2: String(form.get('satz2') ?? ''),
+    mtb: String(form.get('mtb') ?? ''),
+    sieger: String(form.get('sieger') ?? ''),
+  });
   if (!valid.ok) return redirect('/admin/spiele?error=score');
   const s = valid.score;
 
   // Admin-Eintrag ist maßgeblich: bestehende Datensätze dieses Spiels ersetzen.
   const tx = db.transaction(() => {
-    db.prepare(`DELETE FROM results WHERE ${matchWhere}`).run(wettbewerb, gruppe, runde, nr);
+    db.prepare('DELETE FROM results WHERE match_id = ?').run(matchId);
     db.prepare(
-      `INSERT INTO results (wettbewerb, gruppe, runde, match_nr, satz1, satz2, mtb, sieger, status, decided_by, decided_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, datetime('now'))`,
-    ).run(wettbewerb, gruppe, runde, nr, s.satz1, s.satz2, s.mtb, s.sieger, admin.id);
+      `INSERT INTO results (match_id, wettbewerb, gruppe, runde, match_nr, satz1, satz2, mtb, sieger, ergebnis_typ, status, decided_by, decided_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, datetime('now'))`,
+    ).run(matchId, fixture.wettbewerb, fixture.gruppe, fixture.runde, fixture.nr, s.satz1, s.satz2, s.mtb, s.sieger, s.typ, admin.id);
   });
   tx();
+  syncBracketForMatch(matchId);
+  logAction(admin, 'ergebnis_eingetragen', `${matchLabel} — ${[s.satz1, s.satz2, s.mtb].filter(Boolean).join(' · ') || s.typ}`);
 
   return redirect('/admin/spiele?ok=saved');
 };

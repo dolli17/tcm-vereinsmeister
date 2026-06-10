@@ -1,0 +1,133 @@
+---
+import AdminShell from '../../components/AdminShell.astro';
+import { getCompetitions, getMatchRows, getCompetitionPlayers, listSeasons, resolveSeason } from '../../lib/tournament';
+import { getSeasonHonours } from '../../lib/honours';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+if (user.role !== 'admin') return Astro.redirect('/');
+
+const seasons = listSeasons();
+const seasonParam = Number(Astro.url.searchParams.get('season'));
+const selected =
+  seasons.find((s) => s.id === seasonParam) ?? resolveSeason(null) ?? seasons[0] ?? null;
+const competitions = selected ? getCompetitions(selected.id) : [];
+const compInfo = competitions.map((c) => ({
+  c,
+  teilnehmer: getCompetitionPlayers(c.id).length,
+  spiele: getMatchRows(c.id).length,
+}));
+
+// Abschluss-Vorschau: Sieger + offene Spiele der gewählten Saison.
+const honours = selected ? getSeasonHonours(selected.id) : [];
+const offenGesamt = honours.reduce((n, h) => n + h.open, 0);
+
+const ok = Astro.url.searchParams.get('ok');
+const okMsg: Record<string, string> = {
+  created: 'Saison angelegt.', activated: 'Saison aktiviert.', archived: 'Saison archiviert.',
+  comp: 'Konkurrenz gespeichert.', compdel: 'Konkurrenz gelöscht.', meldung: 'Meldefenster umgeschaltet.',
+};
+const err = Astro.url.searchParams.get('error');
+const errMsg: Record<string, string> = {
+  doppelgruppe: 'Doppel-Konkurrenzen sind nur im KO-Modus möglich (Gruppentabellen rechnen je Einzelspieler).',
+};
+---
+
+<AdminShell title="Saisons & Konkurrenzen · Admin" active="saison">
+  <h1 class="admin-h1">Saisons &amp; Konkurrenzen</h1>
+  <p style="color:var(--muted);margin-bottom:16px">Jedes Jahr eine neue Saison anlegen, Konkurrenzen (Gruppe/KO) erstellen und Teilnehmer &amp; Paarungen verwalten.</p>
+
+  {ok && okMsg[ok] && <div class="notice ok">{okMsg[ok]}</div>}
+  {err && <div class="notice err">{errMsg[err] ?? 'Eingabe unvollständig oder ungültig.'}</div>}
+
+  <div class="admin-cols">
+    <!-- Saisons -->
+    <div class="panel">
+      <h2>Saisons <span class="ct">{seasons.length}</span></h2>
+      <div style="margin-bottom:14px">
+        {seasons.map((s) => (
+          <div class="row-item" style={s.id === selected?.id ? 'border-color:var(--accent)' : ''}>
+            <div class="grow">
+              <div style="font-weight:600">{s.name} {s.status === 'aktiv' && <span class="pill ok">aktiv</span>} {!!s.anmeldung_offen && <span class="pill wait">Meldung offen</span>}</div>
+              <div style="font-family:var(--font-mono);font-size:.78rem;color:var(--muted)">Jahr {s.jahr}</div>
+            </div>
+            <div class="row-actions">
+              <a href={`/admin/saison?season=${s.id}`} class={`btn sm ${s.id === selected?.id ? '' : 'ghost'}`}>Konkurrenzen</a>
+              {s.status === 'aktiv' && <form method="POST" action="/api/admin/season"><input type="hidden" name="action" value="meldung" /><input type="hidden" name="season_id" value={s.id} /><button class="btn sm ghost">{s.anmeldung_offen ? 'Meldung schließen' : 'Meldung öffnen'}</button></form>}
+              {s.status !== 'aktiv' && <form method="POST" action="/api/admin/season"><input type="hidden" name="action" value="activate" /><input type="hidden" name="season_id" value={s.id} /><button class="btn sm lime">Aktiv schalten</button></form>}
+              {s.status === 'aktiv' && <form method="POST" action="/api/admin/season" onsubmit="return confirm('Saison abschließen und archivieren? Danach sind keine Ergebnis-Eintragungen mehr möglich; die Sieger erscheinen im Archiv.')"><input type="hidden" name="action" value="archive" /><input type="hidden" name="season_id" value={s.id} /><button class="btn sm ghost">Abschließen &amp; archivieren</button></form>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <form method="POST" action="/api/admin/season" style="border-top:1px solid var(--line);padding-top:14px;display:grid;gap:10px">
+        <input type="hidden" name="action" value="create" />
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <label class="field" style="margin:0;width:110px"><span class="lbl">Jahr</span><input class="input" name="jahr" type="number" required placeholder="2027" /></label>
+          <label class="field" style="margin:0;flex:1;min-width:180px"><span class="lbl">Name</span><input class="input" name="name" placeholder="Vereinsmeisterschaft 2027" /></label>
+          <label style="display:flex;align-items:center;gap:6px;padding-bottom:10px"><input type="checkbox" name="aktiv" /> <span style="font-size:.85rem;color:var(--muted)">direkt aktiv</span></label>
+        </div>
+        <button class="btn">Saison anlegen</button>
+      </form>
+    </div>
+
+    <!-- Konkurrenzen -->
+    <div class="panel">
+      <h2>Konkurrenzen {selected && <span class="ct">· {selected.name}</span>}</h2>
+      {!selected ? <p style="color:var(--muted)">Keine Saison gewählt.</p> : (
+        <>
+          <div style="margin-bottom:14px">
+            {compInfo.length === 0 && <p style="color:var(--muted)">Noch keine Konkurrenzen.</p>}
+            {compInfo.map(({ c, teilnehmer, spiele }) => (
+              <div class="row-item">
+                <div class="grow">
+                  <div style="font-weight:600">{c.name}</div>
+                  <div style="font-family:var(--font-mono);font-size:.78rem;color:var(--muted)">{c.art} · {c.modus === 'gruppe' ? 'Gruppen' : 'KO'} · {teilnehmer} Teilnehmer · {spiele} Spiele</div>
+                </div>
+                <div class="row-actions">
+                  <form method="POST" action="/api/admin/competition"><input type="hidden" name="action" value="comp_move" /><input type="hidden" name="competition_id" value={c.id} /><input type="hidden" name="dir" value="up" /><button class="btn sm ghost" aria-label="Nach oben">▲</button></form>
+                  <form method="POST" action="/api/admin/competition"><input type="hidden" name="action" value="comp_move" /><input type="hidden" name="competition_id" value={c.id} /><input type="hidden" name="dir" value="down" /><button class="btn sm ghost" aria-label="Nach unten">▼</button></form>
+                  <a href={`/admin/konkurrenz/${c.id}`} class="btn sm">Verwalten</a>
+                  <form method="POST" action="/api/admin/competition" onsubmit="return confirm('Konkurrenz inkl. Paarungen und Ergebnissen löschen?')"><input type="hidden" name="action" value="comp_delete" /><input type="hidden" name="competition_id" value={c.id} /><button class="btn sm ghost">Löschen</button></form>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <form method="POST" action="/api/admin/competition" style="border-top:1px solid var(--line);padding-top:14px;display:grid;gap:10px">
+            <input type="hidden" name="action" value="comp_create" />
+            <input type="hidden" name="season_id" value={selected.id} />
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+              <label class="field" style="margin:0;flex:1;min-width:160px"><span class="lbl">Name</span><input class="input" name="name" required placeholder="Herren Einzel" /></label>
+              <label class="field" style="margin:0"><span class="lbl">Art</span><select class="input" name="art"><option value="einzel">Einzel</option><option value="doppel">Doppel</option></select></label>
+              <label class="field" style="margin:0"><span class="lbl">Modus</span><select class="input" name="modus"><option value="gruppe">Gruppen</option><option value="ko">KO</option></select></label>
+            </div>
+            <button class="btn">Konkurrenz anlegen</button>
+          </form>
+        </>
+      )}
+
+      {selected && competitions.length > 0 && (
+        <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">
+          <h2 style="margin-bottom:8px">Saison-Abschluss {selected.status === 'archiviert' && <span class="pill ok">archiviert</span>}</h2>
+          <p style="font-size:.82rem;color:var(--muted);margin-bottom:10px">
+            {offenGesamt === 0
+              ? 'Alle spielbaren Partien sind erfasst — die Saison kann abgeschlossen werden.'
+              : `Noch ${offenGesamt} offene Partie${offenGesamt === 1 ? '' : 'n'} — fehlende Ergebnisse eintragen (oder als kampflos werten) und dann abschließen.`}
+          </p>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            {honours.map((h) => (
+              <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-size:.85rem">
+                <span style="min-width:130px;font-weight:600">{h.competition.name}</span>
+                {h.winners.length === 0
+                  ? <span style="color:var(--muted)">Sieger noch offen{h.open > 0 ? ` (${h.open} Spiele ausstehend)` : ''}</span>
+                  : <span>{h.winners.map((w) => `🏆 ${w.name}${h.winners.length > 1 ? ` (${w.label})` : ''}`).join(' · ')}{h.open > 0 ? ` — ${h.open} offen` : ''}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+</AdminShell>

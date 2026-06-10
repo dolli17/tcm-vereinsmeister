@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import '../styles/design.css';
 
 type Props = {
   title?: string;
@@ -7,13 +8,13 @@ type Props = {
 };
 
 const {
-  title = 'Vereinsmeisterschaft 2026 · TC Muckensturm',
+  title = 'Vereinsmeisterschaft · TC Muckensturm',
   description = 'Live-Tabellen, Spielplan und Ergebnisse der Vereinsmeisterschaft des TC Muckensturm.',
 } = Astro.props;
 ---
 
 <!doctype html>
-<html lang="de">
+<html lang="de" data-theme="b">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -21,6 +22,9 @@ const {
     <meta name="description" content={description} />
     <meta name="robots" content="noindex, nofollow" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Saira+Condensed:wght@500;600;700;800&family=Spline+Sans+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>{title}</title>
   </head>
   <body>

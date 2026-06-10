@@ -1,0 +1,55 @@
+---
+import AppShell from '../components/AppShell.astro';
+import { getActiveSeason, listSeasons } from '../lib/tournament';
+import { getSeasonHonours } from '../lib/honours';
+import { slugifyPlayer } from '../lib/playerStats';
+
+const season = getActiveSeason();
+const seasons = listSeasons();
+const archived = seasons.filter((s) => s.status === 'archiviert');
+const entries = archived.map((s) => ({ season: s, honours: getSeasonHonours(s.id) }));
+---
+
+<AppShell active="comp" season={season} seasons={seasons} title="Archiv · Vereinsmeisterschaft">
+  <div class="section-title">Saison-Archiv</div>
+  <div class="section-sub">Vereinsmeister und Endstände vergangener Saisons.</div>
+
+  <div class="section">
+    {entries.length === 0 ? (
+      <div class="empty" style="padding-top:40px">
+        <div class="t">Noch kein Archiv</div>
+        <div class="d">Sobald eine Saison abgeschlossen ist, erscheinen hier die Sieger.</div>
+      </div>
+    ) : (
+      <div style="display:flex;flex-direction:column;gap:14px">
+        {entries.map(({ season: s, honours }) => (
+          <div class="card" style="padding:16px">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+              <h2 class="section-title" style="padding:0;font-size:1.3rem">{s.name}</h2>
+              <a href={`/?saison=${s.jahr}`} style="margin-left:auto;color:var(--accent);font-weight:700;font-size:.82rem;text-decoration:none">Tabellen &amp; Spielplan →</a>
+            </div>
+            {honours.every((h) => h.winners.length === 0) ? (
+              <p class="section-sub" style="padding:0">Keine Sieger erfasst.</p>
+            ) : (
+              <div style="display:flex;flex-direction:column;gap:8px">
+                {honours.filter((h) => h.winners.length > 0).map((h) => (
+                  <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:8px">
+                    <span style="font-weight:700;min-width:140px">{h.competition.name}</span>
+                    <span style="display:flex;gap:10px;flex-wrap:wrap">
+                      {h.winners.map((w) => (
+                        <span style="font-size:.88rem">
+                          🏆 <a href={`/spieler/${slugifyPlayer(w.name.split(' / ')[0])}`} style="color:inherit;font-weight:600">{w.name}</a>
+                          {h.winners.length > 1 && <span style="color:var(--muted);font-size:.74rem"> ({w.label})</span>}
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+</AppShell>

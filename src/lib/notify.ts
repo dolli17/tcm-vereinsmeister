@@ -2,13 +2,17 @@
 import { getDb } from './db';
 import { sendMail, mailLayout, button } from './mail';
 import type { User } from './auth';
-import type { FixtureRef } from './fixtures';
+import type { FixtureRef } from './matchEntry';
 
-type Score = { satz1: string; satz2: string; mtb: string | null; sieger: 'A' | 'B' };
+type Score = { satz1: string | null; satz2: string | null; mtb: string | null; sieger: 'A' | 'B'; typ?: string };
 
 const sideLabel = (names: string[]) => names.join(' / ');
-const resultLine = (s: { satz1: string; satz2: string; mtb: string | null }) =>
-  [s.satz1, s.satz2, s.mtb].filter(Boolean).join(' · ');
+const resultLine = (s: { satz1: string | null; satz2: string | null; mtb: string | null; typ?: string }) => {
+  const base = [s.satz1, s.satz2, s.mtb].filter(Boolean).join(' · ');
+  if (s.typ === 'wo') return 'kampflos (w.o.)';
+  if (s.typ === 'aufgabe') return base ? `${base} · Aufgabe` : 'Aufgabe';
+  return base;
+};
 
 function matchTitle(fixture: FixtureRef): string {
   const ctx = fixture.runde ?? (fixture.gruppe != null ? `Gruppe ${fixture.gruppe}` : '');
@@ -21,7 +25,7 @@ function adminEmails(): string[] {
   return (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
 }
 
-function emailsForNames(names: string[]): string[] {
+export function emailsForNames(names: string[]): string[] {
   const db = getDb();
   const out: string[] = [];
   for (const name of names) {

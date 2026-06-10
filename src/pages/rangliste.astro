@@ -1,0 +1,43 @@
+---
+import AppShell from '../components/AppShell.astro';
+import { getActiveSeason, listSeasons } from '../lib/tournament';
+import { computeEloRanking } from '../lib/elo';
+import { slugifyPlayer } from '../lib/playerStats';
+
+const season = getActiveSeason();
+const seasons = listSeasons();
+const ranking = computeEloRanking();
+const initials = (n: string) => n.split(' ').filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+---
+
+<AppShell active="comp" season={season} seasons={seasons} title="Ewige Rangliste · Vereinsmeisterschaft">
+  <div class="section-title">Ewige Rangliste</div>
+  <div class="section-sub">ELO-Wertung über alle bestätigten VM-Spiele aller Saisons (Start: 1000, K-Faktor 32).</div>
+
+  <div class="section">
+    {ranking.length === 0 ? (
+      <div class="empty" style="padding-top:40px"><div class="t">Noch keine Spiele</div><div class="d">Sobald Ergebnisse bestätigt sind, entsteht hier die Rangliste.</div></div>
+    ) : (
+      <div class="card">
+        <table class="standings">
+          <thead><tr><th class="pos">#</th><th>Spieler</th><th class="num">Sp</th><th class="num">S</th><th class="pts">ELO</th></tr></thead>
+          <tbody>
+            {ranking.map((r) => (
+              <tr>
+                <td class="pos">{r.platz <= 3 ? ['🥇', '🥈', '🥉'][r.platz - 1] : r.platz}</td>
+                <td class="player">
+                  <a href={`/spieler/${slugifyPlayer(r.name)}`} style="text-decoration:none;color:inherit">
+                    <span class="player-cell"><span class="avatar" style="width:26px;height:26px;font-size:.62rem">{initials(r.name)}</span><span class="nm">{r.name}</span></span>
+                  </a>
+                </td>
+                <td class="num dim">{r.spiele}</td>
+                <td class="num dim">{r.siege}</td>
+                <td class="pts"><span class="v">{r.elo}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+</AppShell>

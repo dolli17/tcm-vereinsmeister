@@ -13,7 +13,13 @@ export type User = {
   player_name: string | null;
   role: 'player' | 'admin';
   claim_status: 'pending' | 'approved' | 'rejected';
+  casual_access: number; // 0 | 1 — Zugriff auf den versteckten Casual-Bereich
 };
+
+// Zugriff auf den privaten Casual-/Head-to-Head-Bereich: Admins immer, sonst per Flag.
+export function hasCasualAccess(user: User | null | undefined): boolean {
+  return !!user && (user.role === 'admin' || user.casual_access === 1);
+}
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -37,7 +43,7 @@ export function verifyPassword(password: string, stored: string | null): boolean
 // ── User-Zugriff ────────────────────────────────────────────────────────────
 export function getUserByEmail(email: string): User | undefined {
   return getDb()
-    .prepare('SELECT id, email, player_name, role, claim_status FROM users WHERE email = ?')
+    .prepare('SELECT id, email, player_name, role, claim_status, casual_access FROM users WHERE email = ?')
     .get(normalizeEmail(email)) as User | undefined;
 }
 
@@ -109,7 +115,7 @@ export function getSessionUser(sessionId: string | undefined): User | null {
   const db = getDb();
   const row = db
     .prepare(
-      `SELECT u.id, u.email, u.player_name, u.role, u.claim_status, s.expires_at
+      `SELECT u.id, u.email, u.player_name, u.role, u.claim_status, u.casual_access, s.expires_at
        FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?`,
     )
     .get(sessionId) as (User & { expires_at: string }) | undefined;

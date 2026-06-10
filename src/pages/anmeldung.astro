@@ -1,0 +1,83 @@
+---
+import AppShell from '../components/AppShell.astro';
+import { getActiveSeason, getCompetitions, listSeasons } from '../lib/tournament';
+import { isRegistered, listRegistrations } from '../lib/registrations';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+
+const season = getActiveSeason();
+const seasons = listSeasons();
+const approved = !!user.player_name && user.claim_status === 'approved';
+const offen = !!season?.anmeldung_offen;
+const competitions = season && offen ? getCompetitions(season.id) : [];
+
+const items = competitions.map((c) => ({
+  c,
+  angemeldet: approved ? isRegistered(c.id, user.player_name!) : false,
+  anzahl: listRegistrations(c.id).length,
+}));
+
+const params = Astro.url.searchParams;
+const ok = params.get('ok');
+const okMsg = ok === 'signup' ? 'Anmeldung gespeichert!' : ok === 'withdraw' ? 'Abmeldung gespeichert.' : null;
+const error = params.get('error');
+const errorMsg =
+  error === 'closed' ? 'Das Meldefenster ist geschlossen.' :
+  error === 'notapproved' ? 'Dein Namensanspruch ist noch nicht freigegeben.' :
+  error ? 'Aktion fehlgeschlagen.' : null;
+---
+
+<AppShell active="me" season={season} seasons={seasons} title="Saison-Anmeldung · Vereinsmeisterschaft">
+  <div class="section-title">Saison-Anmeldung</div>
+  <div class="section-sub">{season ? `Melde dich für die Konkurrenzen der ${season.name} an.` : 'Aktuell keine aktive Saison.'}</div>
+
+  <div class="section">
+    {okMsg && <div class="notice ok">{okMsg}</div>}
+    {errorMsg && <div class="notice err">{errorMsg}</div>}
+
+    {!approved && (
+      <div class="notice err">Du brauchst einen freigegebenen Spielernamen, um dich anzumelden. <a href="/registrieren" style="color:var(--accent);font-weight:700">Namen wählen</a></div>
+    )}
+
+    {season && !offen && (
+      <div class="empty"><div class="t">Meldefenster geschlossen</div><div class="d">Aktuell ist keine Anmeldung möglich. Du wirst informiert, sobald die Meldung für die nächste Saison öffnet.</div></div>
+    )}
+
+    {offen && items.length === 0 && (
+      <div class="empty"><div class="t">Noch keine Konkurrenzen</div><div class="d">Für diese Saison sind noch keine Konkurrenzen angelegt.</div></div>
+    )}
+
+    {approved && offen && items.length > 0 && (
+      <div style="display:flex;flex-direction:column;gap:12px">
+        {items.map(({ c, angemeldet, anzahl }) => (
+          <div class="card" style="padding:14px 16px">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:700">{c.name}</div>
+                <div style="font-size:.76rem;color:var(--muted)">{c.art === 'doppel' ? 'Doppel' : 'Einzel'} · {c.modus === 'gruppe' ? 'Gruppenphase' : 'KO-System'} · {anzahl} Meldung{anzahl === 1 ? '' : 'en'}</div>
+              </div>
+              {angemeldet ? (
+                <form method="POST" action="/api/anmeldung" style="display:flex;align-items:center;gap:8px">
+                  <span class="status-tag done">angemeldet</span>
+                  <input type="hidden" name="action" value="withdraw" />
+                  <input type="hidden" name="competition_id" value={c.id} />
+                  <button class="btn sm ghost" type="submit">Abmelden</button>
+                </form>
+              ) : (
+                <form method="POST" action="/api/anmeldung" style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap">
+                  <input type="hidden" name="action" value="signup" />
+                  <input type="hidden" name="competition_id" value={c.id} />
+                  {c.art === 'doppel' && (
+                    <label style="display:block"><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">Wunschpartner (optional)</span><input class="input" style="min-height:36px" name="notiz" placeholder="Name" /></label>
+                  )}
+                  <button class="btn sm lime" type="submit">Anmelden</button>
+                </form>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+</AppShell>

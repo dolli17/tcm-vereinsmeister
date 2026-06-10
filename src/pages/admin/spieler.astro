@@ -1,0 +1,79 @@
+---
+import AdminShell from '../../components/AdminShell.astro';
+import { listPlayers } from '../../lib/players';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+if (user.role !== 'admin') return Astro.redirect('/');
+
+const players = listPlayers();
+
+const ok = Astro.url.searchParams.get('ok');
+const okMsg: Record<string, string> = { phone: 'Telefonnummer gespeichert.', rename: 'Spieler umbenannt.', created: 'Spieler angelegt.' };
+const err = Astro.url.searchParams.get('error');
+const errMsg: Record<string, string> = { taken: 'Dieser Name ist bereits vergeben.', exists: 'Diesen Spieler gibt es bereits.', input: 'Eingabe ungültig.' };
+---
+
+<AdminShell title="Spieler · Admin" active="spieler">
+  <h1 class="admin-h1">Spielerstamm</h1>
+  <p style="color:var(--muted);margin-bottom:16px">Telefonnummern pflegen und Spieler global umbenennen. Umbenennen zieht überall nach (Tabellen, Paarungen, Accounts, Casual).</p>
+
+  {ok && okMsg[ok] && <div class="notice ok">{okMsg[ok]}</div>}
+  {err && <div class="notice err">{errMsg[err] ?? 'Aktion fehlgeschlagen.'}</div>}
+
+  <div class="panel" style="margin-bottom:16px">
+    <h2>Neuen Spieler anlegen</h2>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:10px">Legt den Spieler im Stamm an — er erscheint danach im Registrierungs-Dropdown und kann Konkurrenzen zugeordnet werden.</p>
+    <form method="POST" action="/api/admin/player" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      <input type="hidden" name="action" value="create" />
+      <label class="field" style="margin:0;flex:1;min-width:200px"><span class="lbl">Name</span><input class="input" name="name" required placeholder="Vor- und Nachname" /></label>
+      <label class="field" style="margin:0;min-width:170px"><span class="lbl">Telefon (optional)</span><input class="input" name="telefon" type="tel" placeholder="z. B. 0151 23456789" /></label>
+      <button class="btn">Spieler anlegen</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+      <h2 style="margin:0">Spieler <span class="ct">{players.length}</span></h2>
+      <input id="pfilter" class="input" style="max-width:260px;margin-left:auto" type="search" placeholder="Spieler suchen…" autocomplete="off" />
+    </div>
+    <div style="overflow-x:auto">
+      <table class="adm-table">
+        <thead><tr><th>Umbenennen</th><th>Telefonnummer</th><th>Account</th></tr></thead>
+        <tbody>
+          {players.map((p) => (
+            <tr data-name={p.name.toLowerCase()}>
+              <td>
+                <form method="POST" action="/api/admin/player" style="display:flex;gap:6px;align-items:center">
+                  <input type="hidden" name="action" value="rename" />
+                  <input type="hidden" name="name" value={p.name} />
+                  <input class="input" style="min-height:36px;min-width:180px" name="new_name" value={p.name} aria-label={`Name von ${p.name}`} />
+                  <button class="btn sm">Speichern</button>
+                </form>
+              </td>
+              <td>
+                <form method="POST" action="/api/admin/player" style="display:flex;gap:6px;align-items:center">
+                  <input type="hidden" name="action" value="phone" />
+                  <input type="hidden" name="name" value={p.name} />
+                  <input class="input" style="min-height:36px;min-width:150px" name="telefon" value={p.telefon ?? ''} placeholder="—" type="tel" aria-label={`Telefon von ${p.name}`} />
+                  <button class="btn sm ghost">Speichern</button>
+                </form>
+              </td>
+              <td>{p.account_email ? <span style="font-family:var(--font-mono);font-size:.8rem">{p.account_email}</span> : <span style="color:var(--muted)">kein Account</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</AdminShell>
+
+<script>
+  const f = document.getElementById('pfilter') as HTMLInputElement | null;
+  f?.addEventListener('input', () => {
+    const q = f.value.trim().toLowerCase();
+    document.querySelectorAll<HTMLElement>('tr[data-name]').forEach((row) => {
+      row.hidden = q !== '' && !(row.dataset.name ?? '').includes(q);
+    });
+  });
+</script>
