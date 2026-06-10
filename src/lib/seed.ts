@@ -76,7 +76,6 @@ function backfillBracketRefs(db: Database.Database): void {
           OR (side_b LIKE 'Sieger %' AND source_match_b IS NULL)`,
     )
     .all() as { id: number; competition_id: number; side_a: string | null; side_b: string | null; source_match_a: number | null; source_match_b: number | null }[];
-  if (rows.length === 0) return;
 
   // 'Sieger Match N' → frühestes Match Nr. N der Konkurrenz; 'Sieger <Runde> N'
   // (z. B. 'Sieger Viertelfinale 2') → Match Nr. N der genannten Runde.
@@ -102,36 +101,53 @@ function backfillBracketRefs(db: Database.Database): void {
       upd.run(resolve(m.side_a, m.source_match_a), resolve(m.side_b, m.source_match_b), m.id);
     }
 
-    // Freilos-Sieger direkt vorrücken: Platzhalter-Seiten, deren Quellmatch ein
-    // Freilos ist, bekommen sofort die echte Seite eingetragen.
-    const placeholderRows = db
-      .prepare(
-        `SELECT id, side_a, side_b, source_match_a, source_match_b FROM matches
-         WHERE (side_a LIKE 'Sieger %' AND source_match_a IS NOT NULL)
-            OR (side_b LIKE 'Sieger %' AND source_match_b IS NOT NULL)`,
-      )
-      .all() as { id: number; side_a: string | null; side_b: string | null; source_match_a: number | null; source_match_b: number | null }[];
+    // Entschiedene Quellmatches vorrücken: Platzhalter-Seiten werden aufgelöst,
+    // wenn das Quellmatch ein Freilos ist ODER bereits ein bestätigtes Ergebnis
+    // hat (Altdaten, die vor der KO-Automatik bestätigt wurden). Läuft bei jedem
+    // Start und iterativ über die Runden (Sieger einer aufgelösten Runde können
+    // weitere Platzhalter auflösen).
+    const placeholderStmt = db.prepare(
+      `SELECT id, side_a, side_b, source_match_a, source_match_b FROM matches
+       WHERE (side_a LIKE 'Sieger %' AND source_match_a IS NOT NULL)
+          OR (side_b LIKE 'Sieger %' AND source_match_b IS NOT NULL)`,
+    );
     const srcStmt = db.prepare('SELECT side_a, side_b FROM matches WHERE id = ?');
+    const confirmedStmt = db.prepare("SELECT sieger FROM results WHERE match_id = ? AND status = 'confirmed' LIMIT 1");
     const setSide = (col: 'side_a' | 'side_b') => db.prepare(`UPDATE matches SET ${col} = ? WHERE id = ?`);
     const setA = setSide('side_a');
     const setB = setSide('side_b');
-    const bye = (s: { side_a: string | null; side_b: string | null }): string | null => {
-      const real = (x: string | null) => !!x && x !== 'BYE' && !isPlaceholder(x);
-      if (s.side_b === 'BYE' && real(s.side_a)) return s.side_a;
-      if (s.side_a === 'BYE' && real(s.side_b)) return s.side_b;
+    const real = (x: string | null) => !!x && x !== 'BYE' && !isPlaceholder(x);
+
+    // Sieger des Quellmatches: bestätigtes Ergebnis > Freilos; sonst offen.
+    const winnerOf = (srcId: number): string | null => {
+      const src = srcStmt.get(srcId) as { side_a: string | null; side_b: string | null } | undefined;
+      if (!src) return null;
+      const res = confirmedStmt.get(srcId) as { sieger: 'A' | 'B' } | undefined;
+      if (res) {
+        const w = res.sieger === 'A' ? src.side_a : src.side_b;
+        return real(w) ? w : null;
+      }
+      if (src.side_b === 'BYE' && real(src.side_a)) return src.side_a;
+      if (src.side_a === 'BYE' && real(src.side_b)) return src.side_b;
       return null;
     };
-    for (const m of placeholderRows) {
-      if (m.side_a?.startsWith('Sieger') && m.source_match_a != null) {
-        const src = srcStmt.get(m.source_match_a) as { side_a: string | null; side_b: string | null } | undefined;
-        const w = src && bye(src);
-        if (w) setA.run(w, m.id);
+
+    for (let pass = 0; pass < 10; pass++) {
+      let changed = 0;
+      const placeholderRows = placeholderStmt.all() as { id: number; side_a: string | null; side_b: string | null; source_match_a: number | null; source_match_b: number | null }[];
+      for (const m of placeholderRows) {
+        // Hat die Folgepartie selbst schon ein bestätigtes Ergebnis, nicht anfassen.
+        if (confirmedStmt.get(m.id)) continue;
+        if (m.side_a?.startsWith('Sieger') && m.source_match_a != null) {
+          const w = winnerOf(m.source_match_a);
+          if (w) { setA.run(w, m.id); changed++; }
+        }
+        if (m.side_b?.startsWith('Sieger') && m.source_match_b != null) {
+          const w = winnerOf(m.source_match_b);
+          if (w) { setB.run(w, m.id); changed++; }
+        }
       }
-      if (m.side_b?.startsWith('Sieger') && m.source_match_b != null) {
-        const src = srcStmt.get(m.source_match_b) as { side_a: string | null; side_b: string | null } | undefined;
-        const w = src && bye(src);
-        if (w) setB.run(w, m.id);
-      }
+      if (changed === 0) break;
     }
   });
   tx();
