@@ -1,0 +1,29 @@
+---
+// "Zuletzt passiert": bestätigte Ergebnisse + frisch vereinbarte Termine.
+import { relTime, type FeedEntry } from '../lib/feed';
+import { formatTermin } from '../lib/termine';
+
+type Props = { entries: FeedEntry[] };
+const { entries } = Astro.props;
+---
+
+{entries.length > 0 && (
+  <div class="card fade-in" style="margin-bottom:18px">
+    <div class="card-head"><span class="ttl">Zuletzt passiert</span></div>
+    <div>
+      {entries.map((e) => (
+        <div class="feed-row">
+          <span class="feed-ic">{e.typ === 'ergebnis' ? '🎾' : '📅'}</span>
+          <span class="feed-text">
+            {e.typ === 'ergebnis' ? (
+              <><b>{e.sieger}</b> schlägt {e.verlierer}{e.result && <span class="feed-score"> {e.result}</span>}</>
+            ) : (
+              <>Termin steht: <b>{e.sideA}</b> vs <b>{e.sideB}</b> · {formatTermin(e.termin)}</>
+            )}
+            <span class="feed-meta">{e.comp} · {relTime(e.zeit)}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
+)}

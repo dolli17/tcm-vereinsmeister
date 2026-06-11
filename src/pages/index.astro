@@ -1,211 +1,95 @@
 ---
 import AppShell from '../components/AppShell.astro';
-import GruppenCard from '../components/GruppenCard.astro';
-import KOView from '../components/KOView.astro';
-import {
-  getCompetitions,
-  getEnrichedMatches,
-  getGruppen,
-  isPlayed,
-  listSeasons,
-  monthIndex,
-  resolveSeason,
-  teamPlayers,
-} from '../lib/tournament';
-import { formatResult } from '../lib/standings';
+import HomePersonal from '../components/HomePersonal.astro';
+import HomeFeed from '../components/HomeFeed.astro';
+import { getActiveSeason, getCompetitions, getEnrichedMatches, isPlayed, listSeasons, teamPlayers } from '../lib/tournament';
+import { getActivityFeed, getUpcomingMatches } from '../lib/feed';
+import { getPlayerMatches } from '../lib/matchEntry';
+import { formatTermin, getPendingProposals, type TerminProposal } from '../lib/termine';
+import { getPhoneMap } from '../lib/players';
 
-const jahrParam = Number(Astro.url.searchParams.get('saison'));
-const season = resolveSeason(Number.isFinite(jahrParam) && jahrParam > 0 ? jahrParam : null);
+// Alte Links/Lesezeichen: /?saison=… zeigte früher die Wettbewerbs-Ansicht.
+const saisonParam = Astro.url.searchParams.get('saison');
+if (saisonParam) return Astro.redirect(`/konkurrenzen?saison=${encodeURIComponent(saisonParam)}`);
+
+const user = Astro.locals.user;
+const season = getActiveSeason();
 const seasons = listSeasons();
-const competitions = season ? getCompetitions(season.id) : [];
 
-const result = formatResult;
-
-// Render-Daten je Konkurrenz vorbereiten (Matches nur einmal laden).
-const panels = competitions.map((comp) => {
-  const matches = getEnrichedMatches(comp.id);
-  if (comp.modus === 'gruppe') {
-    const gruppen = getGruppen(comp.id);
-    const monate = Array.from(new Set(matches.map((m) => m.monat).filter((mo): mo is string => !!mo)))
-      .sort((a, b) => monthIndex(a) - monthIndex(b));
-    const planByMonth = [...monate, ''].map((mo) => ({
-      monat: mo,
-      // '' sammelt Spiele ohne Fälligkeitsmonat ("Termin offen") — sie müssen
-      // im Spielplan sichtbar bleiben.
-      list: matches.filter((m) => (m.monat ?? '') === mo).sort((a, b) => a.nr - b.nr),
-    })).filter((g) => g.list.length > 0);
-    // KO-Phase nach der Gruppenphase: Spiele mit Runde statt Gruppe.
-    const hatKo = matches.some((m) => m.runde != null);
-    return { comp, kind: 'gruppe' as const, matches, gruppen, monate, planByMonth, hatKo };
-  }
-  return { comp, kind: 'ko' as const, matches, gruppen: [], monate: [], planByMonth: [], hatKo: true };
-});
-
-// Fortschritt über alle Konkurrenzen (Freilose/Platzhalter ausgenommen).
+// Saison-Fortschritt (Freilose/Platzhalter ausgenommen) — wie auf /konkurrenzen.
 let done = 0, total = 0;
-for (const p of panels) {
-  for (const m of p.matches) {
-    if (teamPlayers(m.sideA).length === 0 || teamPlayers(m.sideB).length === 0) continue;
-    total++; if (isPlayed(m)) done++;
+if (season) {
+  for (const comp of getCompetitions(season.id)) {
+    for (const m of getEnrichedMatches(comp.id)) {
+      if (teamPlayers(m.sideA).length === 0 || teamPlayers(m.sideB).length === 0) continue;
+      total++; if (isPlayed(m)) done++;
+    }
   }
 }
-const stati = ['Alle', 'Offen', 'Gespielt'];
+
+const feed = season ? getActivityFeed(season.id) : [];
+const upcoming = season ? getUpcomingMatches(season.id) : [];
+
+// Persönlicher Bereich nur mit freigegebenem Spielernamen.
+const approved = !!user?.player_name && user.claim_status === 'approved';
+const playerMatches = approved && user?.player_name ? getPlayerMatches(user.player_name, user.id) : [];
+const proposals: Map<number, TerminProposal> = approved ? getPendingProposals() : new Map();
+const phone = approved ? getPhoneMap() : {};
+const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 ---
 
-<AppShell active="comp" season={season} seasons={seasons} showProgress={true} done={done} total={total}>
-  {competitions.length === 0 ? (
-    <div class="empty" style="padding-top:64px">
-      <div class="t">Keine Konkurrenzen</div>
-      <div class="d">Für diese Saison sind noch keine Konkurrenzen angelegt.</div>
-    </div>
-  ) : (
-    <>
-      <div class="disc-rail">
-        {panels.map((p, i) => (
-          <button class="disc-chip" data-on={i === 0 ? '1' : '0'} data-disc={i}>
-            <span class="dot"></span>{p.comp.name}
-          </button>
-        ))}
+<AppShell active="home" season={season} seasons={seasons} title="Start · Vereinsmeisterschaft">
+  <div class="section" style="padding-top:18px">
+    {approved && user && season ? (
+      <HomePersonal matches={playerMatches} proposals={proposals} userId={user.id} seasonJahr={season.jahr} phone={phone} />
+    ) : (
+      <div class="card fade-in home-hero">
+        <div class="hero-title">🎾 {season ? season.name : 'Vereinsmeisterschaft'}</div>
+        {total > 0 && (
+          <div class="hero-progress">
+            <div class="progress-track"><div class="progress-fill" style={`width:${pct}%`}></div></div>
+            <span class="hero-progress-label"><b>{done}</b> von {total} Partien gespielt</span>
+          </div>
+        )}
+        {user ? (
+          <p class="hero-sub">{user.player_name ? `Dein Namensanspruch „${user.player_name}" wartet auf Freigabe — danach erscheinen hier deine Spiele.` : 'Hinterlege in den Einstellungen deinen Spielernamen, um deine Spiele hier zu sehen.'}</p>
+        ) : (
+          <>
+            <p class="hero-sub">Melde dich an, um deine Spiele, Termine und offenen Aktionen direkt hier zu sehen.</p>
+            <div class="hero-actions">
+              <a href="/login" class="btn">Anmelden</a>
+              <a href="/registrieren" class="btn ghost">Account erstellen</a>
+            </div>
+          </>
+        )}
       </div>
-
-      {panels.map((p, i) => (
-        <div data-panel={i} hidden={i !== 0}>
-          {p.kind === 'gruppe' ? (
-            <>
-              <div class="section">
-                <div class="seg">
-                  <button data-view="tab" data-on="1">Tabellen</button>
-                  <button data-view="plan" data-on="0">Spielplan</button>
-                  {p.hatKo && <button data-view="ko" data-on="0">K.o.-Runde</button>}
-                </div>
-              </div>
-
-              <div data-sub="tab">
-                <div class="section">
-                  {p.gruppen.map((g, gi) => <GruppenCard competition={p.comp} gruppe={g} index={gi} />)}
-                </div>
-                <div class="legend"><span class="swatch"></span> Markierte Plätze qualifizieren sich für die K.o.-Runde</div>
-              </div>
-
-              <div data-sub="plan" hidden>
-                <div class="filter-bar">
-                  {['Alle', ...p.monate].map((mo) => (
-                    <button class="fchip" data-month={mo} data-on={mo === 'Alle' ? '1' : '0'}>{mo}</button>
-                  ))}
-                  <span style="width:1px;background:var(--line);flex-shrink:0;margin:2px 2px"></span>
-                  {stati.map((s) => (
-                    <button class="fchip" data-status={s.toLowerCase()} data-on={s === 'Alle' ? '1' : '0'}>{s}</button>
-                  ))}
-                </div>
-                <div class="section">
-                  {p.planByMonth.map((mg) => (
-                    <div data-monthgroup={mg.monat}>
-                      <div class="month-head"><span class="m">{mg.monat || 'Termin offen'}</span><span class="ln"></span><span class="ct">{mg.list.length} Spiele</span></div>
-                      <div class="card" style="margin-bottom:18px"><div class="matchlist">
-                        {mg.list.map((m) => (
-                          <div class="match" data-match data-status={isPlayed(m) ? 'gespielt' : 'offen'}>
-                            <div class="match-no">#{m.nr}</div>
-                            <div class="match-body">
-                              <div class={`match-side ${m.sieger === 'A' ? 'win' : ''}`}><span class="nm">{m.sideA}</span></div>
-                              <div class="match-vs">{m.gruppe != null ? `Gruppe ${m.gruppe}` : m.runde ?? 'K.o.'}</div>
-                              <div class={`match-side ${m.sieger === 'B' ? 'win' : ''}`}><span class="nm">{m.sideB}</span></div>
-                            </div>
-                            <div class="match-meta">
-                              {isPlayed(m)
-                                ? <><span class="score">{result(m)}</span><span class="status-tag done">gespielt</span></>
-                                : <span class="status-tag open">offen</span>}
-                            </div>
-                          </div>
-                        ))}
-                      </div></div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {p.hatKo && (
-                <div data-sub="ko" hidden>
-                  <div class="section-sub">K.o.-Runde der Gruppenbesten · Auslosung vor Ort</div>
-                  <KOView competition={p.comp} />
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <div class="section-title">{p.comp.name}</div>
-              <div class="section-sub">K.o.-System · Sieger rücken vor, Verlierer scheiden aus</div>
-              <KOView competition={p.comp} />
-            </>
-          )}
-        </div>
-      ))}
-    </>
-  )}
-
-  <p class="section-sub" style="text-align:center;padding:18px 0 8px;display:flex;gap:18px;justify-content:center;flex-wrap:wrap">
-    <a href="/rangliste" style="color:var(--accent);font-weight:700;text-decoration:none">📈 Ewige Rangliste</a>
-    {seasons.some((s) => s.status === 'archiviert') && (
-      <a href="/archiv" style="color:var(--accent);font-weight:700;text-decoration:none">🏆 Saison-Archiv</a>
     )}
-  </p>
+
+    {upcoming.length > 0 && (
+      <div class="card fade-in" style="margin-bottom:18px">
+        <div class="card-head"><span class="ttl">Demnächst auf dem Platz</span><span class="ct">{upcoming.length}</span></div>
+        <div>
+          {upcoming.map((u) => (
+            <div class="feed-row">
+              <span class="feed-ic">📅</span>
+              <span class="feed-text">
+                <b>{u.sideA}</b> vs <b>{u.sideB}</b>
+                <span class="feed-meta">{u.comp} · {formatTermin(u.termin)}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
+    <HomeFeed entries={feed} />
+
+    <p class="section-sub" style="text-align:center;padding:6px 0 14px;display:flex;gap:18px;justify-content:center;flex-wrap:wrap">
+      <a href="/konkurrenzen" style="color:var(--accent);font-weight:700;text-decoration:none">🏆 Tabellen &amp; Spielpläne</a>
+      <a href="/rangliste" style="color:var(--accent);font-weight:700;text-decoration:none">📈 Ewige Rangliste</a>
+      {seasons.some((s) => s.status === 'archiviert') && (
+        <a href="/archiv" style="color:var(--accent);font-weight:700;text-decoration:none">🥇 Saison-Archiv</a>
+      )}
+    </p>
+  </div>
 </AppShell>
-
-<script>
-  // Disziplin-Chips → Panel umschalten
-  const chips = document.querySelectorAll<HTMLButtonElement>('[data-disc]');
-  const panels = document.querySelectorAll<HTMLElement>('[data-panel]');
-  chips.forEach((chip) => chip.addEventListener('click', () => {
-    const i = chip.dataset.disc;
-    chips.forEach((c) => c.dataset.on = c === chip ? '1' : '0');
-    panels.forEach((p) => { p.hidden = p.dataset.panel !== i; });
-  }));
-
-  // Tabellen/Spielplan/K.o.-Umschalter je Panel
-  document.querySelectorAll<HTMLElement>('[data-panel]').forEach((panel) => {
-    const segBtns = panel.querySelectorAll<HTMLButtonElement>('[data-view]');
-    const subs = panel.querySelectorAll<HTMLElement>('[data-sub]');
-    segBtns.forEach((b) => b.addEventListener('click', () => {
-      const v = b.dataset.view;
-      segBtns.forEach((x) => x.dataset.on = x === b ? '1' : '0');
-      subs.forEach((s) => { s.hidden = s.dataset.sub !== v; });
-    }));
-
-    // Filter (Monat/Status) im Spielplan
-    let fMonth = 'Alle', fStatus = 'alle';
-    const apply = () => {
-      panel.querySelectorAll<HTMLElement>('[data-match]').forEach((row) => {
-        const group = row.closest<HTMLElement>('[data-monthgroup]');
-        const mo = group?.dataset.monthgroup ?? '';
-        const monthOk = fMonth === 'Alle' || mo === fMonth;
-        const statusOk = fStatus === 'alle' || row.dataset.status === fStatus;
-        row.hidden = !(monthOk && statusOk);
-      });
-      panel.querySelectorAll<HTMLElement>('[data-monthgroup]').forEach((g) => {
-        const rows = Array.from(g.querySelectorAll<HTMLElement>('[data-match]'));
-        g.hidden = rows.length > 0 && rows.every((r) => r.hidden);
-      });
-    };
-    panel.querySelectorAll<HTMLButtonElement>('[data-month]').forEach((b) => b.addEventListener('click', () => {
-      fMonth = b.dataset.month ?? 'Alle';
-      panel.querySelectorAll<HTMLButtonElement>('[data-month]').forEach((x) => x.dataset.on = x === b ? '1' : '0');
-      apply();
-    }));
-    panel.querySelectorAll<HTMLButtonElement>('[data-status]').forEach((b) => b.addEventListener('click', () => {
-      fStatus = b.dataset.status ?? 'alle';
-      panel.querySelectorAll<HTMLButtonElement>('[data-status]').forEach((x) => x.dataset.on = x === b ? '1' : '0');
-      apply();
-    }));
-  });
-
-  // Gruppen-Spielplan ausklappen
-  document.querySelectorAll<HTMLButtonElement>('[data-collapse]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const el = document.getElementById(btn.dataset.collapse!);
-      if (!el) return;
-      const open = el.getAttribute('data-open') === '1';
-      el.setAttribute('data-open', open ? '0' : '1');
-      btn.setAttribute('data-open', open ? '0' : '1');
-      btn.firstChild && (btn.childNodes[0].textContent = open ? 'Gruppen-Spielplan ansehen ' : 'Spielplan verbergen ');
-    });
-  });
-</script>

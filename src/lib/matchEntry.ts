@@ -77,6 +77,7 @@ export type PlayerMatch = {
   // KO-Platzhalter ("Sieger Match 3"): Gegner steht noch nicht fest — kein Freilos.
   gegnerOffen: boolean;
   termin: string | null;
+  monat: string | null; // Fälligkeitsmonat (für Überfällig-Hinweise)
   status: ResultStatus;
   result: string | null;
   sieger: 'A' | 'B' | null;
@@ -184,6 +185,7 @@ export function getPlayerMatches(playerName: string, userId: number, seasonId?: 
       isBye,
       gegnerOffen,
       termin: m.termin,
+      monat: m.monat,
       status,
       result: res && (res.status === 'confirmed' || res.status === 'pending') ? formatResult(res) : null,
       sieger: res?.sieger ?? null,

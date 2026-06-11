@@ -1,0 +1,105 @@
+---
+// "Dein Bereich" auf der Startseite: offene Aktionen + die nächsten eigenen Spiele.
+import { monthIndex } from '../lib/tournament';
+import { formatTermin, type TerminProposal } from '../lib/termine';
+import type { PlayerMatch } from '../lib/matchEntry';
+
+type Props = {
+  matches: PlayerMatch[];
+  proposals: Map<number, TerminProposal>;
+  userId: number;
+  seasonJahr: number;
+  phone: Record<string, string>;
+};
+const { matches, proposals, userId, seasonJahr, phone } = Astro.props;
+
+const now = new Date();
+const isOverdue = (m: PlayerMatch): boolean => {
+  if (!m.monat) return false;
+  const dueIdx = monthIndex(m.monat) + 1;
+  if (dueIdx > 12) return false;
+  return seasonJahr < now.getFullYear() || (seasonJahr === now.getFullYear() && dueIdx < now.getMonth() + 1);
+};
+const playable = (m: PlayerMatch) => !m.isBye && !m.gegnerOffen;
+const gegnerLabel = (m: PlayerMatch) => m.gegner.join(' / ');
+
+// ── Offene Aktionen ──────────────────────────────────────────────────────────
+type Aktion = { icon: string; text: string; hint: string; warn: boolean };
+const aktionen: Aktion[] = [];
+for (const m of matches.filter(playable)) {
+  const p = proposals.get(m.matchId);
+  if (m.canDecide) {
+    aktionen.push({ icon: '✅', text: `Ergebnis von ${gegnerLabel(m)} bestätigen`, hint: m.wettbewerbLabel, warn: false });
+  }
+  if (p && p.proposed_by !== userId) {
+    aktionen.push({ icon: '📅', text: `Terminvorschlag beantworten: ${formatTermin(p.termin)}`, hint: `${m.wettbewerbLabel} · gegen ${gegnerLabel(m)}`, warn: false });
+  }
+  if (m.status === 'open' && isOverdue(m)) {
+    aktionen.push({ icon: '⏰', text: `Überfällig: gegen ${gegnerLabel(m)} (${m.monat})`, hint: m.wettbewerbLabel, warn: true });
+  }
+}
+
+// ── Nächste Spiele: terminierte zuerst (nach Datum), dann offene (nach Monat) ─
+const offen = matches.filter((m) => playable(m) && m.status === 'open');
+const naechste = [
+  ...offen.filter((m) => m.termin).sort((a, b) => (a.termin! < b.termin! ? -1 : 1)),
+  ...offen.filter((m) => !m.termin).sort((a, b) => monthIndex(a.monat) - monthIndex(b.monat)),
+].slice(0, 4);
+
+const telHref = (t: string) => `tel:${t.replace(/[^\d+]/g, '')}`;
+function whatsappHref(telefon: string): string {
+  const d = telefon.replace(/\D/g, '');
+  const intl = d.startsWith('00') ? d.slice(2) : d.startsWith('0') ? `49${d.slice(1)}` : d;
+  return `https://wa.me/${intl}`;
+}
+---
+
+<div class="card fade-in" style="margin-bottom:18px">
+  <div class="card-head"><span class="ttl">Dein Bereich</span>{aktionen.length > 0 && <span class="ct">{aktionen.length} offen</span>}</div>
+
+  {aktionen.length > 0 && (
+    <div style="padding:10px 14px;border-bottom:1px solid var(--line)">
+      {aktionen.map((a) => (
+        <a href="/meine-spiele" class={`action-item ${a.warn ? 'warn' : ''}`}>
+          <span class="ic">{a.icon}</span>
+          <span class="tx">{a.text}<span class="hint">{a.hint}</span></span>
+          <span class="go">→</span>
+        </a>
+      ))}
+    </div>
+  )}
+
+  {naechste.length === 0 && aktionen.length === 0 ? (
+    <p style="padding:14px;color:var(--muted)">Alles erledigt — keine offenen Spiele 🎾</p>
+  ) : (
+    <div>
+      <div style="padding:10px 14px 4px;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Deine nächsten Spiele</div>
+      {naechste.length === 0 ? (
+        <p style="padding:4px 14px 14px;color:var(--muted)">Keine offenen Spiele mehr 🎾</p>
+      ) : (
+        naechste.map((m) => {
+          const tel = m.gegner.map((g) => ({ name: g, tel: phone[g] })).find((g) => g.tel);
+          return (
+            <div class="feed-row">
+              <span class="feed-ic">{m.termin ? '📅' : '🗓'}</span>
+              <span class="feed-text">
+                gegen <b>{gegnerLabel(m)}</b>
+                {m.partner.length > 0 && <span style="color:var(--muted)"> · mit {m.partner.join(' / ')}</span>}
+                <span class="feed-meta">
+                  {m.wettbewerbLabel}
+                  {m.termin ? ` · ${formatTermin(m.termin)}` : m.monat ? ` · fällig im ${m.monat}` : ' · Termin offen'}
+                </span>
+              </span>
+              <span style="display:flex;gap:8px;align-items:center;white-space:nowrap">
+                {tel && (
+                  <a href={whatsappHref(tel.tel!)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp an ${tel.name}`} style="text-decoration:none">💬</a>
+                )}
+                <a href="/meine-spiele" style="color:var(--accent);font-weight:700;font-size:.8rem;text-decoration:none">{m.termin ? 'Eintragen' : 'Termin'} →</a>
+              </span>
+            </div>
+          );
+        })
+      )}
+    </div>
+  )}
+</div>

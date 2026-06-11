@@ -26,7 +26,7 @@ const entries = archived.map((s) => ({ season: s, honours: getSeasonHonours(s.id
           <div class="card" style="padding:16px">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
               <h2 class="section-title" style="padding:0;font-size:1.3rem">{s.name}</h2>
-              <a href={`/?saison=${s.jahr}`} style="margin-left:auto;color:var(--accent);font-weight:700;font-size:.82rem;text-decoration:none">Tabellen &amp; Spielplan →</a>
+              <a href={`/konkurrenzen?saison=${s.jahr}`} style="margin-left:auto;color:var(--accent);font-weight:700;font-size:.82rem;text-decoration:none">Tabellen &amp; Spielplan →</a>
             </div>
             {honours.every((h) => h.winners.length === 0) ? (
               <p class="section-sub" style="padding:0">Keine Sieger erfasst.</p>

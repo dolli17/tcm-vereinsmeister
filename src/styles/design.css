@@ -733,3 +733,26 @@ h1,h2,h3,h4 { font-family: var(--font-head); font-weight: var(--head-weight); le
 .pill.blocked { background: color-mix(in srgb, var(--danger) 16%, var(--surface)); color: var(--danger); }
 .score-in { width: 3.4rem; min-height: 40px; text-align: center; font-family: var(--font-mono); border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); padding: 4px; outline: none; }
 .score-in:focus { border-color: var(--accent); }
+
+/* ── Startseite: Dein Bereich, Demnächst, Feed ─────────────────────────────── */
+.home-hero { padding: 20px 18px; margin-bottom: 18px; }
+.home-hero .hero-title { font-family: var(--font-head); font-weight: var(--head-weight); letter-spacing: var(--head-spacing); text-transform: var(--head-transform); font-size: 1.35rem; margin-bottom: 10px; }
+.home-hero .hero-sub { color: var(--muted); font-size: .9rem; margin: 10px 0 0; }
+.home-hero .hero-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.home-hero .hero-progress { display: flex; flex-direction: column; gap: 6px; }
+.home-hero .hero-progress-label { font-size: .78rem; color: var(--muted); font-family: var(--font-mono); }
+
+.feed-row { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--line); }
+.feed-row:last-child { border-bottom: none; }
+.feed-ic { flex-shrink: 0; font-size: 1rem; }
+.feed-text { flex: 1; min-width: 0; font-size: .88rem; line-height: 1.35; }
+.feed-score { font-family: var(--font-mono); color: var(--muted); font-size: .8rem; }
+.feed-meta { display: block; font-size: .72rem; color: var(--muted); font-family: var(--font-mono); margin-top: 1px; }
+
+.action-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; margin: 4px 0; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); border-radius: var(--r-sm); text-decoration: none; color: inherit; font-size: .86rem; }
+.action-item.warn { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); background: color-mix(in srgb, var(--danger) 8%, var(--surface)); }
+.action-item .ic { flex-shrink: 0; }
+.action-item .tx { flex: 1; min-width: 0; font-weight: 600; }
+.action-item .tx .hint { display: block; font-weight: 400; font-size: .72rem; color: var(--muted); font-family: var(--font-mono); }
+.action-item .go { color: var(--accent); font-weight: 700; flex-shrink: 0; }
+.action-item.warn .go { color: var(--danger); }
