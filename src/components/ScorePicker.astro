@@ -1,15 +1,16 @@
 ---
-// Satz-Eingabe per Klick (Handy-tauglich, kein Doppelpunkt nötig): je Satz zwei
-// Dropdowns (Du/Gegner, 0–7); der Match-Tiebreak ist EIN Dropdown mit allen
-// gültigen Ergebnissen und erscheint nur bei 1:1 Satzgleichstand. Übertragen
-// werden weiterhin die bekannten Felder satz1/satz2/mtb (hidden, per Script
-// aus der Auswahl zusammengesetzt) — die API bleibt unverändert.
+// Satz-Eingabe per Klick (Handy-tauglich, kein Doppelpunkt nötig). Es sind nur
+// VALIDE Ergebnisse wählbar: je Satz ein Dropdown (6:0–6:4, 7:5, 7:6 — aus
+// eigener Sicht oder gespiegelt), der Match-Tiebreak ist ein Dropdown mit allen
+// gültigen Ergebnissen und erscheint nur bei 1:1 Satzgleichstand. Im Modus
+// "Aufgabe" gibt es stattdessen freie Felder (abgebrochene Sätze wie 3:2 sind
+// dort legitim; das Backend versteht auch "32" → 3:2). Übertragen werden
+// weiterhin die bekannten Felder satz1/satz2/mtb (hidden, per Script gesetzt).
 type Props = { gegner?: string };
 const { gegner = 'Gegner' } = Astro.props;
 
-const GAMES = [0, 1, 2, 3, 4, 5, 6, 7];
-// Gültige MTB-Ergebnisse aus Sicht des Siegers: bis 10 (Verlierer 0–8),
-// danach Verlängerung (Sieger = Verlierer + 2).
+// Gültige Satz- und MTB-Ergebnisse aus Sicht des Gewinners.
+const SET_WIN = ['6:0', '6:1', '6:2', '6:3', '6:4', '7:5', '7:6'];
 const MTB_WIN = ['10:0', '10:1', '10:2', '10:3', '10:4', '10:5', '10:6', '10:7', '10:8', '11:9', '12:10', '13:11', '14:12', '15:13', '16:14', '17:15'];
 const flip = (s: string) => s.split(':').reverse().join(':');
 ---
@@ -18,21 +19,20 @@ const flip = (s: string) => s.split(':').reverse().join(':');
 <input type="hidden" name="satz2" />
 <input type="hidden" name="mtb" />
 
-<div data-sets style="display:flex;gap:16px;flex-wrap:wrap">
+<!-- Gespielt: nur valide Ergebnisse wählbar -->
+<div data-valid-sets style="display:flex;gap:16px;flex-wrap:wrap">
   {[1, 2].map((n) => (
-    <div data-satz={n}>
-      <span class="pick-lbl">Satz {n} — Du : {gegner}</span>
-      <div class="pickrow">
-        <select class="input setpick" data-side="me" aria-label={`Satz ${n}: deine Spiele`}>
-          <option value="">–</option>
-          {GAMES.map((v) => <option value={v}>{v}</option>)}
-        </select>
-        <span class="pick-colon">:</span>
-        <select class="input setpick" data-side="opp" aria-label={`Satz ${n}: Spiele ${gegner}`}>
-          <option value="">–</option>
-          {GAMES.map((v) => <option value={v}>{v}</option>)}
-        </select>
-      </div>
+    <div>
+      <span class="pick-lbl">Satz {n}</span>
+      <select class="input" data-setsel={n} style="min-height:42px;min-width:130px">
+        <option value="">bitte wählen …</option>
+        <optgroup label="Du gewinnst">
+          {SET_WIN.map((v) => <option value={v}>{v}</option>)}
+        </optgroup>
+        <optgroup label={`${gegner} gewinnt`}>
+          {SET_WIN.map((v) => <option value={flip(v)}>{flip(v)}</option>)}
+        </optgroup>
+      </select>
     </div>
   ))}
 </div>
@@ -50,51 +50,65 @@ const flip = (s: string) => s.split(':').reverse().join(':');
   </select>
 </div>
 
+<!-- Aufgabe: erfasste (auch abgebrochene) Sätze frei eintragen -->
+<div data-free-sets style="display:none;gap:10px;flex-wrap:wrap;align-items:flex-end">
+  {['Satz 1', 'Satz 2', 'MTB'].map((lbl, i) => (
+    <label style="display:block">
+      <span class="pick-lbl">{lbl} (optional)</span>
+      <input class="score-in" data-free={i} inputmode="numeric" placeholder={i === 2 ? '10:7' : '6:3'} />
+    </label>
+  ))}
+  <span style="flex-basis:100%;font-size:.7rem;color:var(--muted)">Spielstand beim Abbruch aus deiner Sicht — Ziffern reichen (63 = 6:3).</span>
+</div>
+
 <script>
   // Gilt für alle Eintragungsformulare ([data-entry]) der Seite: Auswahl in die
   // hidden-Felder spiegeln, MTB nur bei 1:1 zeigen, wo/aufgabe-Umschaltung.
   document.querySelectorAll<HTMLFormElement>('[data-entry]').forEach((form) => {
     const typ = form.querySelector<HTMLSelectElement>('[data-typ]');
     const hidden = (name: string) => form.querySelector<HTMLInputElement>(`input[name="${name}"]`);
-    const sideVal = (n: number, side: string): number | null => {
-      const el = form.querySelector<HTMLSelectElement>(`[data-satz="${n}"] [data-side="${side}"]`);
-      return el && el.value !== '' ? parseInt(el.value, 10) : null;
-    };
+    const setSel = (n: number) => form.querySelector<HTMLSelectElement>(`[data-setsel="${n}"]`);
+    const freeIn = (i: number) => form.querySelector<HTMLInputElement>(`[data-free="${i}"]`);
     const mtbWrap = form.querySelector<HTMLElement>('[data-mtbwrap]');
     const mtbSel = form.querySelector<HTMLSelectElement>('[data-mtb]');
+    const validWrap = form.querySelector<HTMLElement>('[data-valid-sets]');
+    const freeWrap = form.querySelector<HTMLElement>('[data-free-sets]');
 
     const sync = () => {
-      const sets = [1, 2].map((n) => {
-        const a = sideVal(n, 'me');
-        const b = sideVal(n, 'opp');
-        return a != null && b != null ? { a, b } : null;
-      });
-      const h1 = hidden('satz1'); if (h1) h1.value = sets[0] ? `${sets[0].a}:${sets[0].b}` : '';
-      const h2 = hidden('satz2'); if (h2) h2.value = sets[1] ? `${sets[1].a}:${sets[1].b}` : '';
+      const mode = typ?.value ?? 'gespielt';
+      if (mode === 'aufgabe') {
+        const h1 = hidden('satz1'); if (h1) h1.value = freeIn(0)?.value.trim() ?? '';
+        const h2 = hidden('satz2'); if (h2) h2.value = freeIn(1)?.value.trim() ?? '';
+        const hm = hidden('mtb'); if (hm) hm.value = freeIn(2)?.value.trim() ?? '';
+        return;
+      }
+      const v1 = setSel(1)?.value ?? '';
+      const v2 = setSel(2)?.value ?? '';
+      const h1 = hidden('satz1'); if (h1) h1.value = mode === 'wo' ? '' : v1;
+      const h2 = hidden('satz2'); if (h2) h2.value = mode === 'wo' ? '' : v2;
 
-      const oneOne = !!(
-        sets[0] && sets[1] &&
-        sets[0].a !== sets[0].b && sets[1].a !== sets[1].b &&
-        (sets[0].a > sets[0].b) !== (sets[1].a > sets[1].b)
-      );
-      const show = oneOne && (!typ || typ.value !== 'wo');
+      const winner = (v: string) => { const [a, b] = v.split(':').map(Number); return a > b; };
+      const oneOne = !!(v1 && v2 && winner(v1) !== winner(v2));
+      const show = oneOne && mode === 'gespielt';
       if (mtbWrap) {
         mtbWrap.hidden = !show;
         if (!show && mtbSel) mtbSel.value = '';
       }
-      const hm = hidden('mtb'); if (hm && mtbSel) hm.value = mtbSel.value;
+      const hm = hidden('mtb'); if (hm) hm.value = mtbSel?.value ?? '';
     };
 
     const apply = () => {
-      if (typ) {
-        const t = typ.value;
-        form.querySelectorAll<HTMLElement>('[data-sets]').forEach((el) => { el.style.display = t === 'wo' ? 'none' : ''; });
-        form.querySelectorAll<HTMLElement>('[data-winner]').forEach((el) => { el.style.display = t === 'gespielt' ? 'none' : ''; });
-      }
+      const t = typ?.value ?? 'gespielt';
+      if (validWrap) validWrap.style.display = t === 'gespielt' ? 'flex' : 'none';
+      if (freeWrap) freeWrap.style.display = t === 'aufgabe' ? 'flex' : 'none';
+      form.querySelectorAll<HTMLElement>('[data-winner]').forEach((el) => { el.style.display = t === 'gespielt' ? 'none' : ''; });
       sync();
     };
 
-    form.querySelectorAll('.setpick, [data-mtb]').forEach((el) => el.addEventListener('change', sync));
+    form.querySelectorAll('[data-setsel], [data-mtb], [data-free]').forEach((el) => {
+      el.addEventListener('change', sync);
+      el.addEventListener('input', sync);
+    });
     typ?.addEventListener('change', apply);
     apply();
   });

@@ -409,10 +409,28 @@ export function validateEntry(input: EntryInput): { ok: true; score: EntryScore 
   return { ok: true, score: { satz1: parts[0], satz2: parts[1], mtb: parts[2], sieger, typ } };
 }
 
+// Gültiger Tennissatz (mit Tiebreak bei 6:6): 6:0–6:4, 7:5 oder 7:6.
+function isValidSet(s: { a: number; b: number }): boolean {
+  const w = Math.max(s.a, s.b);
+  const l = Math.min(s.a, s.b);
+  return (w === 6 && l <= 4) || (w === 7 && (l === 5 || l === 6));
+}
+
+// Gültiger Match-Tiebreak: Sieger 10 (Verlierer 0–8) oder Verlängerung mit
+// genau 2 Punkten Vorsprung (11:9, 12:10, …).
+function isValidMtb(s: { a: number; b: number }): boolean {
+  const w = Math.max(s.a, s.b);
+  const l = Math.min(s.a, s.b);
+  return (w === 10 && l <= 8) || (w >= 11 && w === l + 2);
+}
+
 export function validateScore(input: ScoreInput): { ok: true; score: ValidScore } | { ok: false; error: string } {
   const s1 = parseSet(input.satz1 ?? '');
   const s2 = parseSet(input.satz2 ?? '');
   if (!s1 || !s2) return { ok: false, error: 'Bitte beide Sätze im Format z. B. 6:3 eingeben.' };
+  for (const s of [s1, s2]) {
+    if (!isValidSet(s)) return { ok: false, error: `${s.a}:${s.b} ist kein gültiges Satzergebnis (möglich: 6:0 bis 6:4, 7:5, 7:6).` };
+  }
 
   let winsA = (s1.a > s1.b ? 1 : 0) + (s2.a > s2.b ? 1 : 0);
   let winsB = (s1.a < s1.b ? 1 : 0) + (s2.a < s2.b ? 1 : 0);
@@ -423,10 +441,12 @@ export function validateScore(input: ScoreInput): { ok: true; score: ValidScore 
   if (winsA === 1 && winsB === 1) {
     const m = parseSet(input.mtb ?? '');
     if (!m) return { ok: false, error: 'Bei 1:1 Sätzen bitte den Match-Tiebreak eingeben (z. B. 10:7).' };
+    if (!isValidMtb(m)) return { ok: false, error: `${m.a}:${m.b} ist kein gültiger Match-Tiebreak (bis 10, Verlängerung mit 2 Punkten Vorsprung).` };
     mtb = norm(m);
     if (m.a > m.b) winsA += 1;
-    else if (m.b > m.a) winsB += 1;
-    else return { ok: false, error: 'Der Match-Tiebreak darf nicht unentschieden sein.' };
+    else winsB += 1;
+  } else if ((input.mtb ?? '').trim()) {
+    return { ok: false, error: 'Ein Match-Tiebreak gibt es nur bei 1:1 Sätzen.' };
   }
 
   if (winsA === winsB) return { ok: false, error: 'Das Ergebnis ergibt keinen eindeutigen Sieger.' };
