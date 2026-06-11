@@ -12,7 +12,7 @@ const errorMsg =
   null;
 ---
 
-<AuthShell title="Anmelden · Vereinsmeisterschaft" heading="Anmelden" sub="Melde dich mit E-Mail und Passwort an." back={{ href: '/', label: '← Zur Übersicht' }}>
+<AuthShell title="Anmelden · Vereinsmeisterschaft" heading="Willkommen zurück auf dem Platz." sub="Melde dich an, um deine Spiele, Termine und offenen Aktionen direkt zu sehen." toggle="login" back={{ href: '/', label: '← Zur Übersicht' }}>
   {resetDone && <div class="notice ok">Passwort geändert. Du kannst dich jetzt anmelden.</div>}
   {errorMsg && <div class="notice err">{errorMsg}</div>}
 
@@ -23,5 +23,4 @@ const errorMsg =
   </form>
 
   <div class="linkrow"><a href="/passwort-vergessen">Passwort vergessen?</a></div>
-  <div class="linkrow">Noch kein Account? <a href="/registrieren">Hier registrieren</a></div>
 </AuthShell>

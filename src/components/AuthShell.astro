@@ -1,22 +1,40 @@
 ---
+// Auth-Rahmen im Redesign: blauer "Crown"-Header mit Ball-Icon + weißem Logo,
+// darunter das aufliegende Sheet mit den Formularen. Optionaler Umschalter
+// Anmelden/Registrieren (toggle), Formulare kommen unverändert per Slot.
 import Layout from '../layouts/Layout.astro';
 
-type Props = { title?: string; heading: string; sub?: string; back?: { href: string; label: string } };
-const { title, heading, sub, back } = Astro.props;
+type Props = {
+  title?: string;
+  heading: string;
+  sub?: string;
+  back?: { href: string; label: string };
+  toggle?: 'login' | 'register';
+};
+const { title, heading, sub, back, toggle } = Astro.props;
+
+const BALL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M4.5 6.5c3.6 2 5 5.4 4.2 9.8M19.5 6.5c-3.6 2-5 5.4-4.2 9.8"/></svg>';
 ---
 
 <Layout title={title}>
   <div class="app plain">
     <div class="scroll">
-      <div style="display:flex;justify-content:center;padding:26px 18px 6px">
-        <img class="brand-logo" style="height:54px" src="/tcm-logo.png" alt="TC Muckensturm" />
-      </div>
-      <div class="auth-wrap" style="max-width:460px;margin:0 auto">
-        {back && <a href={back.href} class="backbar" style="border:none;padding:6px 0 14px;display:inline-flex">{back.label}</a>}
-        <h1 class="section-title" style="padding:0 0 4px">{heading}</h1>
-        {sub && <p class="section-sub" style="padding:0 0 18px">{sub}</p>}
-        <div class="auth-card">
+      <div class="auth">
+        <div class="crown">
+          <div class="ball" set:html={BALL} />
+          <img src="/tcm-logo.png" alt="TC Muckensturm" />
+          <h1>{heading}</h1>
+          {sub && <p>{sub}</p>}
+        </div>
+        <div class="sheet">
+          {toggle && (
+            <div class="segtoggle">
+              <a href="/login" class={toggle === 'login' ? 'on' : ''}>Anmelden</a>
+              <a href="/registrieren" class={toggle === 'register' ? 'on' : ''}>Registrieren</a>
+            </div>
+          )}
           <slot />
+          {back && <div class="authalt"><a href={back.href}>{back.label}</a></div>}
         </div>
       </div>
     </div>

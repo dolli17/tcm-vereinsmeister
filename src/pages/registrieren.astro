@@ -26,7 +26,7 @@ const errorMsg =
   null;
 ---
 
-<AuthShell title="Registrieren · TC Muckensturm" heading="Registrieren" sub="Gib deinen Namen, deine E-Mail und ein Passwort an. Ein Admin bestätigt anschließend, dass der Name zu dir gehört — danach kannst du an Vereinsmeisterschaft und Forderungsliste teilnehmen." back={{ href: '/', label: '← Zur Übersicht' }}>
+<AuthShell title="Registrieren · TC Muckensturm" heading="Werde Teil der Vereinsmeisterschaft." sub="Name, E-Mail und Passwort genügen. Ein Admin bestätigt, dass der Name zu dir gehört — danach kannst du an Vereinsmeisterschaft und Forderungsliste teilnehmen." toggle="register" back={{ href: '/', label: '← Zur Übersicht' }}>
   {errorMsg && <div class="notice err">{errorMsg}</div>}
 
   <form method="POST" action="/api/auth/register">

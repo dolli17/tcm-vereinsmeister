@@ -5,25 +5,45 @@ import { formatTermin } from '../lib/termine';
 
 type Props = { entries: FeedEntry[] };
 const { entries } = Astro.props;
+
+const BALL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M4.5 6.5c3.6 2 5 5.4 4.2 9.8M19.5 6.5c-3.6 2-5 5.4-4.2 9.8"/></svg>';
+const CAL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 9.5h16M8 3.5v3.5M16 3.5v3.5"/></svg>';
+
+// Ergebnis-String in Satz-Chips zerlegen ("6:3 · 6:4 · 10:7"); kampflos → w.o.-Chip.
+const chips = (result: string): { wo: boolean; sets: string[] } => {
+  if (!result || result.includes('kampflos')) return { wo: true, sets: ['w.o.'] };
+  return { wo: false, sets: result.split(' · ').filter(Boolean) };
+};
 ---
 
 {entries.length > 0 && (
-  <div class="card fade-in" style="margin-bottom:18px">
-    <div class="card-head"><span class="ttl">Zuletzt passiert</span></div>
-    <div>
+  <>
+    <div class="sectionlabel"><h2>Zuletzt passiert</h2></div>
+    <div class="feed fade-in">
       {entries.map((e) => (
-        <div class="feed-row">
-          <span class="feed-ic">{e.typ === 'ergebnis' ? '🎾' : '📅'}</span>
-          <span class="feed-text">
+        <div class="feedrow">
+          <div class={`ic ${e.typ === 'termin' ? 'gold' : ''}`} set:html={e.typ === 'termin' ? CAL : BALL} />
+          <div class="info">
             {e.typ === 'ergebnis' ? (
-              <><b>{e.sieger}</b> schlägt {e.verlierer}{e.result && <span class="feed-score"> {e.result}</span>}</>
+              <div class="who"><b>{e.sieger}</b> <span class="beat">schlägt</span> {e.verlierer}</div>
             ) : (
-              <>Termin steht: <b>{e.sideA}</b> vs <b>{e.sideB}</b> · {formatTermin(e.termin)}</>
+              <div class="who">Termin steht: <b>{e.sideA}</b> <span class="beat">vs</span> <b>{e.sideB}</b></div>
             )}
-            <span class="feed-meta">{e.comp} · {relTime(e.zeit)}</span>
-          </span>
+            <div class="sub">
+              <span class="cat">{e.comp}</span> · {relTime(e.zeit)}
+              {e.typ === 'termin' && <> · {formatTermin(e.termin)}</>}
+            </div>
+          </div>
+          {e.typ === 'ergebnis' && (() => {
+            const c = chips(e.result);
+            return (
+              <div class={`setchips ${c.wo ? 'wo' : ''}`}>
+                {c.sets.map((s) => <i>{s}</i>)}
+              </div>
+            );
+          })()}
         </div>
       ))}
     </div>
-  </div>
+  </>
 )}

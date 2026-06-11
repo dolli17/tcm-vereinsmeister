@@ -38,6 +38,20 @@ const errorMsg =
     {errorMsg && <div class="notice err">{errorMsg}</div>}
 
     <div class="card" style="padding:18px 16px;margin-bottom:14px">
+      <h2 class="section-title" style="padding:0 0 10px;font-size:1.3rem">Darstellung</h2>
+      <div class="switchrow">
+        <span class="sl">
+          <b>Dunkles Design</b>
+          <small>Ohne eigene Wahl folgt die App der Geräteeinstellung.</small>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="darkmode-toggle" aria-label="Dunkles Design umschalten" />
+          <span class="knob"></span>
+        </span>
+      </div>
+    </div>
+
+    <div class="card" style="padding:18px 16px;margin-bottom:14px">
       <h2 class="section-title" style="padding:0 0 4px;font-size:1.3rem">Anzeigename</h2>
       {approved ? (
         <form method="POST" action="/api/settings/name">
@@ -93,3 +107,17 @@ const errorMsg =
     </div>
   </div>
 </AppShell>
+
+<script>
+  // Darkmode-Schalter: explizite Wahl in localStorage speichern — sie schlägt
+  // ab dann die Systemeinstellung (siehe Inline-Script im Layout).
+  const toggle = document.getElementById('darkmode-toggle') as HTMLInputElement | null;
+  if (toggle) {
+    toggle.checked = document.documentElement.dataset.theme === 'dark';
+    toggle.addEventListener('change', () => {
+      const theme = toggle.checked ? 'dark' : 'light';
+      document.documentElement.dataset.theme = theme;
+      try { localStorage.setItem('vm-theme', theme); } catch {}
+    });
+  }
+</script>

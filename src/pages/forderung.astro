@@ -124,15 +124,15 @@ const errMsg: Record<string, string> = {
       return (
         <div class="card" style="padding:14px 16px;margin-bottom:14px;border-color:var(--accent)">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
-            <span class="status-tag done" style="background:var(--accent-soft);color:var(--accent)">⚔ Deine Forderung</span>
+            <span class="status-tag done" style="background:var(--accent-soft);color:var(--accent)">Deine Forderung</span>
             <span style="font-size:.78rem;color:var(--muted)">Frist: {fmtDatum(c.deadline)}</span>
           </div>
           <div style="font-weight:700;font-size:1rem">{ichForderer ? `Du forderst ${gegner}` : `${gegner} fordert dich`}</div>
-          {c.termin && <div style="font-size:.8rem;margin-top:4px">📅 Termin: {formatTermin(c.termin)}</div>}
+          {c.termin && <div style="font-size:.8rem;margin-top:4px">Termin: {formatTermin(c.termin)}</div>}
           {phones[gegner] && c.status === 'offen' && (
             <div style="display:flex;gap:6px;margin-top:8px">
-              <a class="btn sm ghost" href={waLink(phones[gegner])} target="_blank" rel="noopener">💬 WhatsApp</a>
-              <a class="btn sm ghost" href={`tel:${telDigits(phones[gegner])}`}>📞 Anrufen</a>
+              <a class="btn sm ghost" href={waLink(phones[gegner])} target="_blank" rel="noopener">WhatsApp</a>
+              <a class="btn sm ghost" href={`tel:${telDigits(phones[gegner])}`}>Anrufen</a>
             </div>
           )}
 
@@ -210,7 +210,7 @@ const errMsg: Record<string, string> = {
         {approved && eigeneListe === d.liste && !myEntry && (
           <form method="POST" action="/api/ladder" style="margin-bottom:14px">
             <input type="hidden" name="action" value="join" />
-            <button class="btn block lime">⚔ In die {listeLabel(d.liste)}-Forderungsliste eintragen</button>
+            <button class="btn block lime">In die {listeLabel(d.liste)}-Forderungsliste eintragen</button>
           </form>
         )}
 
@@ -253,8 +253,8 @@ const errMsg: Record<string, string> = {
             <h2 class="section-title" style="padding:0 0 8px;font-size:1.1rem">Laufende Forderungen</h2>
             {d.open.map((c) => (
               <div style="display:flex;justify-content:space-between;gap:8px;font-size:.85rem;padding:4px 0;border-bottom:1px solid var(--line);flex-wrap:wrap">
-                <span>⚔ <b>{c.challenger}</b> fordert <b>{c.challenged}</b>{c.status === 'ergebnis_pending' ? ' · Ergebnis wartet auf Bestätigung' : ''}</span>
-                <span style="font-family:var(--font-mono);color:var(--muted);white-space:nowrap">bis {fmtDatum(c.deadline)}{c.termin ? ` · 📅 ${formatTermin(c.termin)}` : ''}</span>
+                <span><b>{c.challenger}</b> fordert <b>{c.challenged}</b>{c.status === 'ergebnis_pending' ? ' · Ergebnis wartet auf Bestätigung' : ''}</span>
+                <span style="font-family:var(--font-mono);color:var(--muted);white-space:nowrap">bis {fmtDatum(c.deadline)}{c.termin ? ` · ${formatTermin(c.termin)}` : ''}</span>
               </div>
             ))}
           </div>
@@ -271,7 +271,7 @@ const errMsg: Record<string, string> = {
   </div>
 
   <p class="section-sub" style="text-align:center;padding:18px 0 8px;display:flex;gap:18px;justify-content:center;flex-wrap:wrap">
-    <a href="/regeln#forderung" style="color:var(--accent);font-weight:700;text-decoration:none">📖 Forderungs-Regeln</a>
+    <a href="/regeln#forderung" style="color:var(--blue);font-weight:700;text-decoration:none">Forderungs-Regeln</a>
   </p>
 </AppShell>
 

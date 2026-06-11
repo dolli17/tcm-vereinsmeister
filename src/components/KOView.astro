@@ -14,6 +14,7 @@ function whatsappHref(telefon: string): string {
 const telHref = (t: string) => `tel:${t.replace(/[^\d+]/g, '')}`;
 const WA = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1 0 12 2zm5.8 14.2c-.2.7-1.4 1.3-2 1.4-.5.1-1.2.1-1.9-.1-.4-.1-1-.3-1.7-.6-3-1.3-4.9-4.3-5.1-4.5-.1-.2-1.2-1.6-1.2-3 0-1.4.7-2.1 1-2.4.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 1.9c.1.2.1.4 0 .5l-.4.6c-.1.1-.3.3-.1.6.1.3.6 1 1.3 1.6.9.8 1.6 1 1.9 1.2.2.1.4.1.6-.1l.7-.8c.2-.2.4-.2.6-.1l1.8.9c.2.1.4.2.5.3.1.2.1.9-.1 1.6z"/></svg>';
 const TEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7.1 4.1 8.3 6.7 7 8c.6 1.5 1.7 2.7 3.1 3.1l1.3-1.3 2.6 1.2-.2 2.2c0 .5-.4.9-.9.9-4.4-.1-8-3.7-8.1-8.1 0-.5.4-.9.9-.9l2.4-.1Z"/></svg>';
+const TROPHY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4.5v1.5A3 3 0 0 0 7 10.4M17 6h2.5v1.5A3 3 0 0 1 17 10.4"/><path d="M9.5 14.5 9 19h6l-.5-4.5M8 19h8"/></svg>';
 
 const all = getEnrichedMatches(competition.id);
 const runden = getRunden(competition.id).map((name) => ({
@@ -32,10 +33,13 @@ const setsWon = (m: EnrichedMatch): [number, number] => {
   }
   return [a, b];
 };
-const scoreSummary = (m: EnrichedMatch) => {
-  if (m.ergebnisTyp === 'wo') return 'w.o.';
+// Anzeige je Seite: gewonnene Sätze; kampflos → "w.o." beim Sieger.
+const teamScore = (m: EnrichedMatch, side: 'A' | 'B'): string | null => {
+  if (!isPlayed(m)) return null;
+  if (m.ergebnisTyp === 'wo') return m.sieger === side ? 'w.o.' : '–';
   const [a, b] = setsWon(m);
-  return m.ergebnisTyp === 'aufgabe' ? `${a}:${b} aufg.` : `${a}:${b}`;
+  const own = side === 'A' ? a : b;
+  return m.ergebnisTyp === 'aufgabe' && m.sieger === side ? `${own}*` : String(own);
 };
 
 // Vereinsmeister: Sieger des letzten (Final-)Matches, falls gespielt.
@@ -45,55 +49,46 @@ if (lastRound && lastRound.matches.length === 1) {
   const f = lastRound.matches[0];
   if (isPlayed(f)) champion = f.sieger === 'A' ? f.sideA : f.sideB;
 }
-
-function teamCell(side: string | null, win: boolean, m: EnrichedMatch) {
-  return { names: teamPlayers(side), cls: isBye(side) ? 'bye' : isPlaceholder(side) ? 'tbd' : '', label: side, win };
-}
 ---
 
 <div class="bracket-hint">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h13M11 7l5 5-5 5M21 5v14"/></svg>
-  Zum Navigieren seitlich wischen
+  <span class="tag">K.o.</span>
+  Sieger rücken vor · seitlich wischen für mehr
 </div>
 <div class="bracket-scroll">
   <div class="bracket">
-    {runden.map((rd, ri) => {
+    {runden.map((rd) => {
       const playedR = rd.matches.filter(isPlayed).length;
-      const isFinalRound = ri === runden.length - 1;
       return (
-        <div class="ko-round">
-          <div class="ko-round-h">{rd.name} <span class="ct">{playedR}/{rd.matches.length}</span></div>
-          <div class="ko-matches">
+        <div class="bcol">
+          <div class="rname">{rd.name} <span class="pc">{playedR}/{rd.matches.length}</span></div>
+          <div class="bmatches">
             {rd.matches.map((m) => {
               const bye = isBye(m.sideA) || isBye(m.sideB);
-              const a = teamCell(m.sideA, m.sieger === 'A', m);
-              const b = teamCell(m.sideB, m.sieger === 'B', m);
+              const sides: { raw: string | null; win: boolean; sc: string | null }[] = [
+                { raw: m.sideA, win: m.sieger === 'A', sc: teamScore(m, 'A') },
+                { raw: m.sideB, win: m.sieger === 'B', sc: teamScore(m, 'B') },
+              ];
               return (
-                <div class={`ko-match ${isFinalRound ? 'final' : ''}`}>
-                  <span class="ko-no">Match {m.nr}</span>
-                  {bye && <span class="ko-mtag">Freilos</span>}
-                  <div class={`ko-team ${a.win ? 'win' : ''} ${a.cls}`}>
-                    <span class="nm">{a.names.length ? a.names.map((n) => (
-                      <span class="pair">{n}{phone[n] && (
-                        <span class="contact">
-                          <a class="cico wa" href={whatsappHref(phone[n])} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp an ${n}`} set:html={WA} />
-                          <a class="cico tel" href={telHref(phone[n])} aria-label={`${n} anrufen`} set:html={TEL} />
-                        </span>
-                      )}</span>
-                    )) : <span class="pair">{a.label ?? 'offen'}</span>}</span>
-                    {a.win && isPlayed(m) && <span class="sc">{scoreSummary(m)}</span>}
-                  </div>
-                  <div class={`ko-team ${b.win ? 'win' : ''} ${b.cls}`}>
-                    <span class="nm">{b.names.length ? b.names.map((n) => (
-                      <span class="pair">{n}{phone[n] && (
-                        <span class="contact">
-                          <a class="cico wa" href={whatsappHref(phone[n])} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp an ${n}`} set:html={WA} />
-                          <a class="cico tel" href={telHref(phone[n])} aria-label={`${n} anrufen`} set:html={TEL} />
-                        </span>
-                      )}</span>
-                    )) : <span class="pair">{b.label ?? 'offen'}</span>}</span>
-                    {b.win && isPlayed(m) && <span class="sc">{scoreSummary(m)}</span>}
-                  </div>
+                <div class="bmatch">
+                  <span class="mlabel">Match {m.nr}{bye ? ' · Freilos' : ''}</span>
+                  {sides.map((s) => {
+                    const names = teamPlayers(s.raw);
+                    const cls = isBye(s.raw) ? 'bye' : isPlaceholder(s.raw) ? 'tbd' : '';
+                    return (
+                      <div class={`bteam ${s.win && isPlayed(m) ? 'win' : ''} ${cls}`}>
+                        <span class="nm">{names.length ? names.map((n) => (
+                          <span class="pair">{n}{phone[n] && (
+                            <span class="contact">
+                              <a class="cico wa" href={whatsappHref(phone[n])} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp an ${n}`} set:html={WA} />
+                              <a class="cico tel" href={telHref(phone[n])} aria-label={`${n} anrufen`} set:html={TEL} />
+                            </span>
+                          )}</span>
+                        )) : <span class="pair">{s.raw ?? 'offen'}</span>}</span>
+                        {s.sc != null && <span class="sc">{s.sc}</span>}
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
@@ -103,9 +98,9 @@ function teamCell(side: string | null, win: boolean, m: EnrichedMatch) {
     })}
     <div class="ko-champ">
       <div class="champ-card">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 4h12v3a6 6 0 0 1-12 0V4z"/><path d="M6 5H3v2a3 3 0 0 0 3 3M18 5h3v2a3 3 0 0 1-3 3M9 14v3M15 14v3M8 20h8"/></svg>
+        <div class="cup" set:html={TROPHY} />
         <div class="lbl">Vereinsmeister</div>
-        <div class="nm">{champion ?? 'offen'}</div>
+        <div class={`nm ${champion ? 'crowned' : ''}`}>{champion ?? 'noch offen'}</div>
       </div>
     </div>
   </div>

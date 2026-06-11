@@ -50,6 +50,9 @@ for (const p of panels) {
   }
 }
 const stati = ['Alle', 'Offen', 'Gespielt'];
+const I_TROPHY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4.5v1.5A3 3 0 0 0 7 10.4M17 6h2.5v1.5A3 3 0 0 1 17 10.4"/><path d="M9.5 14.5 9 19h6l-.5-4.5M8 19h8"/></svg>';
+const I_CAL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 9.5h16M8 3.5v3.5M16 3.5v3.5"/></svg>';
+const I_BRACKET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M4 5h4v6h4M4 19h4v-8M16 11h4M12 11h2"/></svg>';
 ---
 
 <AppShell active="comp" season={season} seasons={seasons} showProgress={true} done={done} total={total}>
@@ -74,9 +77,9 @@ const stati = ['Alle', 'Offen', 'Gespielt'];
             <>
               <div class="section">
                 <div class="seg">
-                  <button data-view="tab" data-on="1">Tabellen</button>
-                  <button data-view="plan" data-on="0">Spielplan</button>
-                  {p.hatKo && <button data-view="ko" data-on="0">K.o.-Runde</button>}
+                  <button data-view="tab" data-on="1"><Fragment set:html={I_TROPHY} /> Tabellen</button>
+                  <button data-view="plan" data-on="0"><Fragment set:html={I_CAL} /> Spielplan</button>
+                  {p.hatKo && <button data-view="ko" data-on="0"><Fragment set:html={I_BRACKET} /> K.o.</button>}
                 </div>
               </div>
 
@@ -143,10 +146,10 @@ const stati = ['Alle', 'Offen', 'Gespielt'];
   )}
 
   <p class="section-sub" style="text-align:center;padding:18px 0 8px;display:flex;gap:18px;justify-content:center;flex-wrap:wrap">
-    <a href="/regeln" style="color:var(--accent);font-weight:700;text-decoration:none">📖 Regeln &amp; Punktesystem</a>
-    <a href="/rangliste" style="color:var(--accent);font-weight:700;text-decoration:none">📈 Ewige Rangliste</a>
+    <a href="/regeln" style="color:var(--blue);font-weight:700;text-decoration:none">Regeln &amp; Punktesystem</a>
+    <a href="/rangliste" style="color:var(--blue);font-weight:700;text-decoration:none">Ewige Rangliste</a>
     {seasons.some((s) => s.status === 'archiviert') && (
-      <a href="/archiv" style="color:var(--accent);font-weight:700;text-decoration:none">🏆 Saison-Archiv</a>
+      <a href="/archiv" style="color:var(--blue);font-weight:700;text-decoration:none">Saison-Archiv</a>
     )}
   </p>
 </AppShell>

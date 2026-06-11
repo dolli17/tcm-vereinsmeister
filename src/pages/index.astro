@@ -2,7 +2,15 @@
 import AppShell from '../components/AppShell.astro';
 import HomePersonal from '../components/HomePersonal.astro';
 import HomeFeed from '../components/HomeFeed.astro';
-import { getActiveSeason, getCompetitions, getEnrichedMatches, isPlayed, listSeasons, teamPlayers } from '../lib/tournament';
+import {
+  getActiveSeason,
+  getCompetitionPlayers,
+  getCompetitions,
+  getEnrichedMatches,
+  isPlayed,
+  listSeasons,
+  teamPlayers,
+} from '../lib/tournament';
 import { getActivityFeed, getUpcomingMatches } from '../lib/feed';
 import { getPlayerMatches } from '../lib/matchEntry';
 import { formatTermin, getPendingProposals, type TerminProposal } from '../lib/termine';
@@ -16,16 +24,21 @@ const user = Astro.locals.user;
 const season = getActiveSeason();
 const seasons = listSeasons();
 
-// Saison-Fortschritt (Freilose/Platzhalter ausgenommen) — wie auf /konkurrenzen.
-let done = 0, total = 0;
+// Saison-Kennzahlen für den Hero (Freilose/Platzhalter ausgenommen).
+let done = 0, total = 0, compCount = 0;
+const teilnehmer = new Set<string>();
 if (season) {
   for (const comp of getCompetitions(season.id)) {
+    compCount++;
+    for (const p of getCompetitionPlayers(comp.id)) for (const n of teamPlayers(p.player_name)) teilnehmer.add(n);
     for (const m of getEnrichedMatches(comp.id)) {
       if (teamPlayers(m.sideA).length === 0 || teamPlayers(m.sideB).length === 0) continue;
       total++; if (isPlayed(m)) done++;
     }
   }
 }
+const offen = total - done;
+const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
 const feed = season ? getActivityFeed(season.id) : [];
 const upcoming = season ? getUpcomingMatches(season.id) : [];
@@ -35,61 +48,106 @@ const approved = !!user?.player_name && user.claim_status === 'approved';
 const playerMatches = approved && user?.player_name ? getPlayerMatches(user.player_name, user.id) : [];
 const proposals: Map<number, TerminProposal> = approved ? getPendingProposals() : new Map();
 const phone = approved ? getPhoneMap() : {};
-const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+// Eigene Saison-Bilanz für den persönlichen Hero (nur spielbare Partien).
+const spielbar = playerMatches.filter((m) => !m.isBye && !m.gegnerOffen);
+const meineSiege = spielbar.filter((m) => m.status === 'confirmed' && m.ichGewonnen === true).length;
+const meineNiederlagen = spielbar.filter((m) => m.status === 'confirmed' && m.ichGewonnen === false).length;
+const meineOffen = spielbar.filter((m) => m.status === 'open').length;
+const vorname = approved && user?.player_name ? user.player_name.split(' ')[0] : '';
+
+const BALL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M4.5 6.5c3.6 2 5 5.4 4.2 9.8M19.5 6.5c-3.6 2-5 5.4-4.2 9.8"/></svg>';
+const TROPHY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4.5v1.5A3 3 0 0 0 7 10.4M17 6h2.5v1.5A3 3 0 0 1 17 10.4"/><path d="M9.5 14.5 9 19h6l-.5-4.5M8 19h8"/></svg>';
+const CAL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 9.5h16M8 3.5v3.5M16 3.5v3.5"/></svg>';
 ---
 
 <AppShell active="home" season={season} seasons={seasons} title="Start · Vereinsmeisterschaft">
-  <div class="section" style="padding-top:18px">
-    {approved && user && season ? (
-      <HomePersonal matches={playerMatches} proposals={proposals} userId={user.id} seasonJahr={season.jahr} phone={phone} />
-    ) : (
-      <div class="card fade-in home-hero">
-        <div class="hero-title">🎾 {season ? season.name : 'Vereinsmeisterschaft'}</div>
-        {total > 0 && (
-          <div class="hero-progress">
-            <div class="progress-track"><div class="progress-fill" style={`width:${pct}%`}></div></div>
-            <span class="hero-progress-label"><b>{done}</b> von {total} Partien gespielt</span>
+  <div style="padding-top:8px">
+    <div class="hero fade-in">
+      <div class="ball" set:html={BALL} />
+      <div class="kicker"><Fragment set:html={TROPHY} /> Vereinsmeisterschaft {season ? season.jahr : ''}</div>
+      {approved ? (
+        <h1>Hallo {vorname}!</h1>
+      ) : (
+        <h1>Wer wird Vereins&shy;meister {season ? season.jahr : ''}?</h1>
+      )}
+
+      {total > 0 && (
+        <div class="prog">
+          <div class="nums">
+            <span class="big">{done}</span>
+            <span class="lbl">von {total} Partien der Saison gespielt</span>
           </div>
-        )}
-        {user ? (
-          <p class="hero-sub">{user.player_name ? `Dein Namensanspruch „${user.player_name}" wartet auf Freigabe — danach erscheinen hier deine Spiele.` : 'Hinterlege in den Einstellungen deinen Spielernamen, um deine Spiele hier zu sehen.'}</p>
-        ) : (
-          <>
-            <p class="hero-sub">Melde dich an, um deine Spiele, Termine und offenen Aktionen direkt hier zu sehen.</p>
-            <div class="hero-actions">
-              <a href="/login" class="btn">Anmelden</a>
-              <a href="/registrieren" class="btn ghost">Account erstellen</a>
-            </div>
-          </>
-        )}
-      </div>
+          <div class="bar"><i style={`width:${pct}%`}></i></div>
+        </div>
+      )}
+
+      {approved ? (
+        <div class="meta">
+          <div class="pill"><b>{meineSiege}</b><span>{meineSiege === 1 ? 'Sieg' : 'Siege'}</span></div>
+          <div class="pill"><b>{meineNiederlagen}</b><span>{meineNiederlagen === 1 ? 'Niederlage' : 'Niederlagen'}</span></div>
+          <div class="pill"><b>{meineOffen}</b><span>{meineOffen === 1 ? 'offenes Spiel' : 'offene Spiele'}</span></div>
+        </div>
+      ) : (
+        <div class="meta">
+          <div class="pill"><b>{teilnehmer.size}</b><span>Teilnehmer</span></div>
+          <div class="pill"><b>{compCount}</b><span>Konkurrenzen</span></div>
+          <div class="pill"><b>{offen}</b><span>noch offen</span></div>
+        </div>
+      )}
+
+      {!user && (
+        <div class="heroactions">
+          <a href="/login">Anmelden</a>
+          <a href="/registrieren">Account erstellen</a>
+        </div>
+      )}
+    </div>
+
+    {user && !approved && (
+      <p class="section-sub" style="padding-top:14px">
+        {user.player_name
+          ? `Dein Namensanspruch „${user.player_name}" wartet auf Freigabe — danach erscheinen hier deine Spiele.`
+          : 'Hinterlege in den Einstellungen deinen Spielernamen, um deine Spiele hier zu sehen.'}
+      </p>
+    )}
+
+    {approved && user && season && (
+      <HomePersonal matches={playerMatches} proposals={proposals} userId={user.id} seasonJahr={season.jahr} phone={phone} />
     )}
 
     {upcoming.length > 0 && (
-      <div class="card fade-in" style="margin-bottom:18px">
-        <div class="card-head"><span class="ttl">Demnächst auf dem Platz</span><span class="ct">{upcoming.length}</span></div>
-        <div>
+      <>
+        <div class="sectionlabel"><h2>Demnächst auf dem Platz</h2></div>
+        <div class="feed">
           {upcoming.map((u) => (
-            <div class="feed-row">
-              <span class="feed-ic">📅</span>
-              <span class="feed-text">
-                <b>{u.sideA}</b> vs <b>{u.sideB}</b>
-                <span class="feed-meta">{u.comp} · {formatTermin(u.termin)}</span>
-              </span>
+            <div class="feedrow">
+              <div class="ic gold" set:html={CAL} />
+              <div class="info">
+                <div class="who"><b>{u.sideA}</b> <span class="beat">vs</span> <b>{u.sideB}</b></div>
+                <div class="sub"><span class="cat">{u.comp}</span> · {formatTermin(u.termin)}</div>
+              </div>
             </div>
           ))}
         </div>
-      </div>
+      </>
     )}
 
     <HomeFeed entries={feed} />
 
-    <p class="section-sub" style="text-align:center;padding:6px 0 14px;display:flex;gap:18px;justify-content:center;flex-wrap:wrap">
-      <a href="/konkurrenzen" style="color:var(--accent);font-weight:700;text-decoration:none">🏆 Tabellen &amp; Spielpläne</a>
-      <a href="/rangliste" style="color:var(--accent);font-weight:700;text-decoration:none">📈 Ewige Rangliste</a>
-      {seasons.some((s) => s.status === 'archiviert') && (
-        <a href="/archiv" style="color:var(--accent);font-weight:700;text-decoration:none">🥇 Saison-Archiv</a>
-      )}
-    </p>
+    <div class="cta2">
+      <a href="/konkurrenzen" class="btn"><Fragment set:html={TROPHY} /> Tabellen</a>
+      <a href="/rangliste" class="btn ghost">Ewige Rangliste</a>
+    </div>
+    {seasons.some((s) => s.status === 'archiviert') && (
+      <p class="section-sub" style="text-align:center;padding:14px 20px 6px">
+        <a href="/archiv" style="font-weight:700;text-decoration:none">Saison-Archiv ansehen →</a>
+      </p>
+    )}
+    <div class="spacer"></div>
   </div>
 </AppShell>
+
+<style>
+  .cta2 .btn svg { width: 18px; height: 18px; }
+</style>

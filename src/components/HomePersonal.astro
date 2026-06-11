@@ -24,18 +24,18 @@ const playable = (m: PlayerMatch) => !m.isBye && !m.gegnerOffen;
 const gegnerLabel = (m: PlayerMatch) => m.gegner.join(' / ');
 
 // ── Offene Aktionen ──────────────────────────────────────────────────────────
-type Aktion = { icon: string; text: string; hint: string; warn: boolean };
+type Aktion = { icon: 'check' | 'cal' | 'clock'; text: string; hint: string; warn: boolean };
 const aktionen: Aktion[] = [];
 for (const m of matches.filter(playable)) {
   const p = proposals.get(m.matchId);
   if (m.canDecide) {
-    aktionen.push({ icon: '✅', text: `Ergebnis von ${gegnerLabel(m)} bestätigen`, hint: m.wettbewerbLabel, warn: false });
+    aktionen.push({ icon: 'check', text: `Ergebnis von ${gegnerLabel(m)} bestätigen`, hint: m.wettbewerbLabel, warn: false });
   }
   if (p && p.proposed_by !== userId) {
-    aktionen.push({ icon: '📅', text: `Terminvorschlag beantworten: ${formatTermin(p.termin)}`, hint: `${m.wettbewerbLabel} · gegen ${gegnerLabel(m)}`, warn: false });
+    aktionen.push({ icon: 'cal', text: `Terminvorschlag beantworten: ${formatTermin(p.termin)}`, hint: `${m.wettbewerbLabel} · gegen ${gegnerLabel(m)}`, warn: false });
   }
   if (m.status === 'open' && isOverdue(m)) {
-    aktionen.push({ icon: '⏰', text: `Überfällig: gegen ${gegnerLabel(m)} (${m.monat})`, hint: m.wettbewerbLabel, warn: true });
+    aktionen.push({ icon: 'clock', text: `Überfällig: gegen ${gegnerLabel(m)} (${m.monat})`, hint: m.wettbewerbLabel, warn: true });
   }
 }
 
@@ -44,7 +44,7 @@ const offen = matches.filter((m) => playable(m) && m.status === 'open');
 const naechste = [
   ...offen.filter((m) => m.termin).sort((a, b) => (a.termin! < b.termin! ? -1 : 1)),
   ...offen.filter((m) => !m.termin).sort((a, b) => monthIndex(a.monat) - monthIndex(b.monat)),
-].slice(0, 4);
+].slice(0, 2);
 
 const telHref = (t: string) => `tel:${t.replace(/[^\d+]/g, '')}`;
 function whatsappHref(telefon: string): string {
@@ -52,54 +52,61 @@ function whatsappHref(telefon: string): string {
   const intl = d.startsWith('00') ? d.slice(2) : d.startsWith('0') ? `49${d.slice(1)}` : d;
   return `https://wa.me/${intl}`;
 }
+
+const SVG: Record<string, string> = {
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17l9-10"/></svg>',
+  cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 9.5h16M8 3.5v3.5M16 3.5v3.5"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+  ball: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M4.5 6.5c3.6 2 5 5.4 4.2 9.8M19.5 6.5c-3.6 2-5 5.4-4.2 9.8"/></svg>',
+  wa: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 4.9-1.3A10 10 0 1 0 12 2Zm5.6 14.2c-.2.6-1.2 1.2-1.7 1.2-.4 0-1 .1-3.1-.8-2.6-1.1-4.3-3.8-4.4-4-.1-.2-1-1.4-1-2.6 0-1.2.6-1.8.9-2 .2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.4.6c-.2.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.4 2.4 1.5.2.1.4.1.6-.1l.7-.9c.2-.2.3-.2.6-.1l1.9.9c.3.1.5.2.5.4.1.1.1.7-.1 1.3Z"/></svg>',
+};
 ---
 
-<div class="card fade-in" style="margin-bottom:18px">
-  <div class="card-head"><span class="ttl">Dein Bereich</span>{aktionen.length > 0 && <span class="ct">{aktionen.length} offen</span>}</div>
-
+<div class="fade-in">
   {aktionen.length > 0 && (
-    <div style="padding:10px 14px;border-bottom:1px solid var(--line)">
-      {aktionen.map((a) => (
-        <a href="/meine-spiele" class={`action-item ${a.warn ? 'warn' : ''}`}>
-          <span class="ic">{a.icon}</span>
-          <span class="tx">{a.text}<span class="hint">{a.hint}</span></span>
-          <span class="go">→</span>
-        </a>
-      ))}
-    </div>
+    <>
+      <div class="sectionlabel"><h2>Offene Aktionen</h2></div>
+      <div style="margin:0 20px">
+        {aktionen.map((a) => (
+          <a href="/meine-spiele" class={`action-item ${a.warn ? 'warn' : ''}`}>
+            <span class="ic" set:html={SVG[a.icon]} />
+            <span class="tx">{a.text}<span class="hint">{a.hint}</span></span>
+            <span class="go">→</span>
+          </a>
+        ))}
+      </div>
+    </>
   )}
 
-  {naechste.length === 0 && aktionen.length === 0 ? (
-    <p style="padding:14px;color:var(--muted)">Alles erledigt — keine offenen Spiele 🎾</p>
+  <div class="sectionlabel">
+    <h2>Deine nächsten Spiele</h2>
+    <a href="/meine-spiele">Alle</a>
+  </div>
+  {naechste.length === 0 ? (
+    <p class="section-sub" style="padding-bottom:4px">Alles erledigt — keine offenen Spiele.</p>
   ) : (
-    <div>
-      <div style="padding:10px 14px 4px;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Deine nächsten Spiele</div>
-      {naechste.length === 0 ? (
-        <p style="padding:4px 14px 14px;color:var(--muted)">Keine offenen Spiele mehr 🎾</p>
-      ) : (
-        naechste.map((m) => {
-          const tel = m.gegner.map((g) => ({ name: g, tel: phone[g] })).find((g) => g.tel);
-          return (
-            <div class="feed-row">
-              <span class="feed-ic">{m.termin ? '📅' : '🗓'}</span>
-              <span class="feed-text">
-                gegen <b>{gegnerLabel(m)}</b>
-                {m.partner.length > 0 && <span style="color:var(--muted)"> · mit {m.partner.join(' / ')}</span>}
-                <span class="feed-meta">
-                  {m.wettbewerbLabel}
-                  {m.termin ? ` · ${formatTermin(m.termin)}` : m.monat ? ` · fällig im ${m.monat}` : ' · Termin offen'}
-                </span>
-              </span>
-              <span style="display:flex;gap:8px;align-items:center;white-space:nowrap">
-                {tel && (
-                  <a href={whatsappHref(tel.tel!)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp an ${tel.name}`} style="text-decoration:none">💬</a>
-                )}
-                <a href="/meine-spiele" style="color:var(--accent);font-weight:700;font-size:.8rem;text-decoration:none">{m.termin ? 'Eintragen' : 'Termin'} →</a>
-              </span>
+    <div class="feed">
+      {naechste.map((m) => {
+        const tel = m.gegner.map((g) => ({ name: g, tel: phone[g] })).find((g) => g.tel);
+        return (
+          <div class="feedrow">
+            <div class={`ic ${m.termin ? 'gold' : ''}`} set:html={m.termin ? SVG.cal : SVG.ball} />
+            <div class="info">
+              <div class="who">gegen <b>{gegnerLabel(m)}</b>{m.partner.length > 0 && <span class="beat"> · mit {m.partner.join(' / ')}</span>}</div>
+              <div class="sub">
+                <span class="cat">{m.wettbewerbLabel}</span>
+                · {m.termin ? formatTermin(m.termin) : m.monat ? `fällig im ${m.monat}` : 'Termin offen'}
+              </div>
             </div>
-          );
-        })
-      )}
+            <span style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+              {tel && (
+                <a class="cico wa" href={whatsappHref(tel.tel!)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp an ${tel.name}`} set:html={SVG.wa} />
+              )}
+              <a href="/meine-spiele" style="color:var(--blue);font-weight:700;font-size:.8rem;text-decoration:none;white-space:nowrap">{m.termin ? 'Eintragen' : 'Termin'} →</a>
+            </span>
+          </div>
+        );
+      })}
     </div>
   )}
 </div>

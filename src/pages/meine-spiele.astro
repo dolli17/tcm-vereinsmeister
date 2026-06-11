@@ -63,6 +63,13 @@ const statusInfo: Record<PlayerMatch['status'], { text: string; cls: string }> =
   confirmed: { text: 'bestätigt', cls: 'done' },
   rejected: { text: 'in Klärung', cls: 'done' },
 };
+const initials = (names: string[]) => {
+  const src = names[0] ?? '?';
+  return src.split(' ').filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+};
+const I_WA = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 4.9-1.3A10 10 0 1 0 12 2Zm5.6 14.2c-.2.6-1.2 1.2-1.7 1.2-.4 0-1 .1-3.1-.8-2.6-1.1-4.3-3.8-4.4-4-.1-.2-1-1.4-1-2.6 0-1.2.6-1.8.9-2 .2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.4.6c-.2.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.4 2.4 1.5.2.1.4.1.6-.1l.7-.9c.2-.2.3-.2.6-.1l1.9.9c.3.1.5.2.5.4.1.1.1.7-.1 1.3Z"/></svg>';
+const I_TEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M6 3.5 8.5 4l1 3.5L8 9.2a11 11 0 0 0 5 5l1.7-1.6 3.5 1 .5 2.5c0 1.2-1 2.2-2.2 2.1A14.5 14.5 0 0 1 3.9 5.7 2 2 0 0 1 6 3.5Z"/></svg>';
+const I_CAL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 9.5h16M8 3.5v3.5M16 3.5v3.5"/></svg>';
 ---
 
 <AppShell active="me" season={season} seasons={seasons} title="Meine Spiele · Vereinsmeisterschaft">
@@ -112,30 +119,40 @@ const statusInfo: Record<PlayerMatch['status'], { text: string; cls: string }> =
         {approved && matches.length === 0 && <p class="section-sub" style="padding-left:0">Für dich sind aktuell keine Spiele hinterlegt.</p>}
 
         {approved && (
-          <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="todo" style="margin:0">
             {matches.map((m) => (
-              <div class="card" style="padding:14px 16px">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-                  <span class="status-tag done" style="background:var(--accent-soft);color:var(--accent)">{m.wettbewerbLabel}</span>
-                  <span style="font-size:.72rem;color:var(--muted)">{ctxLabel(m)} · #{String(m.nr).padStart(2, '0')}</span>
-                  <span style="margin-left:auto" class={`status-tag ${m.isBye || m.gegnerOffen ? 'done' : statusInfo[m.status].cls}`}>{m.isBye ? 'Freilos' : m.gegnerOffen ? 'Gegner offen' : statusInfo[m.status].text}</span>
+              <div class="tmatch">
+                <div class="top">
+                  <span class="tcat">{m.wettbewerbLabel} · {ctxLabel(m)}</span>
+                  {m.isBye || m.gegnerOffen ? (
+                    <span class="due" style="margin-left:auto;background:var(--chip);color:var(--muted)">{m.isBye ? 'Freilos' : 'Gegner offen'}</span>
+                  ) : m.status === 'open' && m.monat ? (
+                    <span class="due">bis Ende {m.monat}</span>
+                  ) : (
+                    <span class={`due ${m.status === 'rejected' ? 'soon' : ''}`} style={m.status !== 'open' && m.status !== 'rejected' ? 'background:var(--chip);color:var(--muted)' : ''}>{statusInfo[m.status].text}</span>
+                  )}
                 </div>
 
-                <div class="match-side" style="padding:0">
-                  <span class="nm" style="font-size:1rem;font-weight:700">{m.sideA.length ? m.sideA.join(' / ') : m.gegnerOffen ? 'Noch offen' : 'Freilos'} <span style="color:var(--muted);font-weight:600">vs</span> {m.sideB.length ? m.sideB.join(' / ') : m.gegnerOffen ? 'Noch offen' : 'Freilos'}</span>
-                </div>
-                <div style="font-size:.78rem;color:var(--muted);margin-top:3px">
-                  {m.isBye ? 'Freilos — kein Ergebnis nötig.' : m.gegnerOffen ? 'Der Gegner steht noch nicht fest (vorherige Runde offen).' : `Gegner: ${m.gegner.join(' / ')}`}{m.partner.length > 0 ? ` · Partner: ${m.partner.join(' / ')}` : ''}
+                <div class="vsrow">
+                  <div class="opp">
+                    <div class="av">{m.gegnerOffen ? '?' : initials(m.gegner.length ? m.gegner : ['Freilos'])}</div>
+                    <div class="meta">
+                      <div class="vs">{m.isBye ? 'Freilos — kein Ergebnis nötig' : m.gegnerOffen ? 'Gegner steht noch nicht fest' : m.partner.length > 0 ? 'Eure Gegner' : 'Dein Gegner'}</div>
+                      <div class="on">{m.gegner.length ? m.gegner.join(' / ') : m.gegnerOffen ? 'Noch offen' : '—'}</div>
+                      {m.partner.length > 0 && <div class="pn">mit {m.partner.join(' / ')}</div>}
+                    </div>
+                  </div>
                 </div>
 
+                <div class="inner">
                 {(m.status === 'confirmed' || m.status === 'pending') && m.result && (
-                  <div style="margin-top:8px" class="score">{m.result}{m.ichGewonnen != null ? (m.ichGewonnen ? ' · gewonnen' : ' · verloren') : ''}</div>
+                  <div class="score" style="display:inline-block">{m.result}{m.ichGewonnen != null ? (m.ichGewonnen ? ' · gewonnen' : ' · verloren') : ''}</div>
                 )}
                 {m.status === 'pending' && m.submittedByMe && (
                   <div style="font-size:.8rem;color:var(--muted);margin-top:6px">Du hast eingetragen — warte auf Bestätigung des Gegners.</div>
                 )}
                 {m.status === 'rejected' && (
-                  <div style="font-size:.8rem;color:var(--danger);margin-top:6px">Abgelehnt{m.rejectReason ? `: ${m.rejectReason}` : ''}. Der Sportwart klärt das.</div>
+                  <div style="font-size:.8rem;color:var(--red);margin-top:6px">Abgelehnt{m.rejectReason ? `: ${m.rejectReason}` : ''}. Der Sportwart klärt das.</div>
                 )}
 
                 {/* Terminvereinbarung: bestätigter Termin, offener Vorschlag oder neues Vorschlagsformular */}
@@ -143,11 +160,12 @@ const statusInfo: Record<PlayerMatch['status'], { text: string; cls: string }> =
                   const p = proposals.get(m.matchId);
                   const iAmProposer = p?.proposed_by === user.id;
                   return (
-                    <div style="margin-top:8px;padding:8px 10px;border:1px dashed var(--line);border-radius:8px">
+                    <div style="margin-top:4px;padding:10px 12px;border:1.5px dashed var(--line-strong);border-radius:12px">
                       {m.termin && (
-                        <div style="font-size:.8rem;margin-bottom:6px">
-                          📅 <b>Termin:</b> {formatTermin(m.termin)}
-                          <a href={`/api/termin-ics?match_id=${m.matchId}`} style="margin-left:8px;color:var(--accent);font-weight:700">In Kalender (ICS)</a>
+                        <div style="font-size:.82rem;margin-bottom:6px;display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+                          <span style="color:var(--blue);display:inline-flex;width:16px;height:16px" set:html={I_CAL} />
+                          <b>{formatTermin(m.termin)}</b>
+                          <a href={`/api/termin-ics?match_id=${m.matchId}`} style="color:var(--blue);font-weight:700;text-decoration:none">In Kalender (ICS)</a>
                         </div>
                       )}
                       {p && iAmProposer && (
@@ -156,7 +174,7 @@ const statusInfo: Record<PlayerMatch['status'], { text: string; cls: string }> =
                       {p && !iAmProposer && (
                         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                           <span style="font-size:.8rem">{p.proposer_name ?? 'Gegner'} schlägt vor: <b>{formatTermin(p.termin)}</b></span>
-                          <form method="POST" action="/api/termin"><input type="hidden" name="action" value="decide" /><input type="hidden" name="proposal_id" value={p.id} /><input type="hidden" name="decision" value="accept" /><button class="btn sm lime">Passt</button></form>
+                          <form method="POST" action="/api/termin"><input type="hidden" name="action" value="decide" /><input type="hidden" name="proposal_id" value={p.id} /><input type="hidden" name="decision" value="accept" /><button class="btn sm">Passt</button></form>
                           <form method="POST" action="/api/termin"><input type="hidden" name="action" value="decide" /><input type="hidden" name="proposal_id" value={p.id} /><input type="hidden" name="decision" value="decline" /><button class="btn sm ghost">Passt nicht</button></form>
                         </div>
                       )}
@@ -164,23 +182,13 @@ const statusInfo: Record<PlayerMatch['status'], { text: string; cls: string }> =
                         <form method="POST" action="/api/termin" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
                           <input type="hidden" name="action" value="propose" />
                           <input type="hidden" name="match_id" value={m.matchId} />
-                          <label style="display:block"><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">{m.termin ? 'Neuen Termin vorschlagen' : 'Termin vorschlagen'}</span><input class="input" style="min-height:36px" type="datetime-local" name="termin" required /></label>
+                          <label style="display:block;flex:1;min-width:170px"><span style="font-size:.7rem;color:var(--muted);display:block;margin-bottom:3px">{m.termin ? 'Neuen Termin vorschlagen' : 'Termin vorschlagen'}</span><input class="input" style="min-height:40px" type="datetime-local" name="termin" required /></label>
                           <button type="submit" class="btn sm ghost">Vorschlagen</button>
                         </form>
                       )}
                     </div>
                   );
                 })()}
-                {m.status === 'open' && !m.isBye && !m.gegnerOffen && m.gegner.some((g) => phones[g]) && (
-                  <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center">
-                    {m.gegner.filter((g) => phones[g]).map((g) => (
-                      <>
-                        <a class="btn sm ghost" href={waLink(phones[g])} target="_blank" rel="noopener">💬 WhatsApp{m.gegner.length > 1 ? ` ${g.split(' ')[0]}` : ''}</a>
-                        <a class="btn sm ghost" href={`tel:${telDigits(phones[g])}`}>📞 Anrufen{m.gegner.length > 1 ? ` ${g.split(' ')[0]}` : ''}</a>
-                      </>
-                    ))}
-                  </div>
-                )}
                 {m.canEnter && (
                   <form method="POST" action="/api/results" style="margin-top:10px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap" data-entry>
                     <input type="hidden" name="match_id" value={m.matchId} />
@@ -209,14 +217,26 @@ const statusInfo: Record<PlayerMatch['status'], { text: string; cls: string }> =
                     <form method="POST" action="/api/results/decide">
                       <input type="hidden" name="result_id" value={m.resultId} />
                       <input type="hidden" name="action" value="accept" />
-                      <button type="submit" class="btn sm lime">Annehmen</button>
+                      <button type="submit" class="btn sm">Annehmen</button>
                     </form>
                     <form method="POST" action="/api/results/decide" style="display:flex;gap:8px;align-items:flex-end">
                       <input type="hidden" name="result_id" value={m.resultId} />
                       <input type="hidden" name="action" value="reject" />
-                      <label style="display:block"><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">Grund (optional)</span><input class="input" style="min-height:36px;min-width:140px" name="reason" placeholder="z. B. Satz 2 war 6:3" /></label>
+                      <label style="display:block"><span style="font-size:.7rem;color:var(--muted);display:block;margin-bottom:3px">Grund (optional)</span><input class="input" style="min-height:40px;min-width:140px" name="reason" placeholder="z. B. Satz 2 war 6:3" /></label>
                       <button type="submit" class="btn sm danger">Ablehnen</button>
                     </form>
+                  </div>
+                )}
+                </div>
+
+                {m.status === 'open' && !m.isBye && !m.gegnerOffen && m.gegner.some((g) => phones[g]) && (
+                  <div class="acts">
+                    {m.gegner.filter((g) => phones[g]).map((g) => (
+                      <>
+                        <a class="wa" href={waLink(phones[g])} target="_blank" rel="noopener"><Fragment set:html={I_WA} /> WhatsApp{m.gegner.length > 1 ? ` ${g.split(' ')[0]}` : ''}</a>
+                        <a href={`tel:${telDigits(phones[g])}`}><Fragment set:html={I_TEL} /> Anrufen{m.gegner.length > 1 ? ` ${g.split(' ')[0]}` : ''}</a>
+                      </>
+                    ))}
                   </div>
                 )}
               </div>

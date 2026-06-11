@@ -17,25 +17,33 @@ const { title, active, season = null, seasons = [], showProgress = false, done =
 const user = Astro.locals.user;
 const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
+// Icon-Set aus dem Redesign (saubere Line-Icons statt Emojis).
 const ICON = {
-  trophy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 4h12v3a6 6 0 0 1-12 0V4z"/><path d="M6 5H3v2a3 3 0 0 0 3 3M18 5h3v2a3 3 0 0 1-3 3M9 14v3M15 14v3M8 20h8"/></svg>',
-  swords: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 4l9 9M4 4h4M4 4v4M20 4l-9 9M20 4h-4M20 4v4M7 17l-3 3M17 17l3 3M6 14l4 4M18 14l-4 4"/></svg>',
-  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>',
-  login: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>',
-  dots: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
-  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-8 9 8"/><path d="M5 9v11h5v-6h4v6h5V9"/></svg>',
-  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1"/></svg>',
-  spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2L5 14h6l-1 8 9-13h-6l0-7z"/></svg>',
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M4 11.5 12 5l8 6.5"/><path d="M5.5 10.5V19h13v-8.5"/></svg>',
+  trophy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4.5v1.5A3 3 0 0 0 7 10.4M17 6h2.5v1.5A3 3 0 0 1 17 10.4"/><path d="M9.5 14.5 9 19h6l-.5-4.5M8 19h8"/></svg>',
+  swords: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M14.5 14.5 20 9V4h-5l-5.5 5.5M14.5 14.5 9.5 9.5M14.5 14.5l3.5 3.5M16 16l2 2M9.5 14.5 4 9V4h5l5.5 5.5M9.5 14.5l-3.5 3.5M8 16l-2 2"/></svg>',
+  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.6"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg>',
+  cog: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M21 12h-2.5M5.5 12H3M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8M18.4 18.4l-1.8-1.8M7.4 7.4 5.6 5.6"/></svg>',
+  ball: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M4.5 6.5c3.6 2 5 5.4 4.2 9.8M19.5 6.5c-3.6 2-5 5.4-4.2 9.8"/></svg>',
+  login: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>',
 };
+
+// Initialen für den Avatar (Menü-Trigger): Spielername, sonst E-Mail.
+const initials = (() => {
+  if (!user) return '';
+  const src = user.player_name ?? user.email;
+  const parts = src.split(/[\s@.]+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || 'TC';
+})();
 
 const tabs = [
   { id: 'home', label: 'Start', href: '/', icon: ICON.home },
   { id: 'comp', label: 'Wettbewerbe', href: '/konkurrenzen', icon: ICON.trophy },
   { id: 'ladder', label: 'Forderung', href: '/forderung', icon: ICON.swords },
   // Casual nur für Accounts mit Zugriff (Flag oder Admin) — versteckter Bereich.
-  ...(hasCasualAccess(user) ? [{ id: 'casual', label: 'Casual', href: '/casual', icon: ICON.spark }] : []),
+  ...(hasCasualAccess(user) ? [{ id: 'casual', label: 'Casual', href: '/casual', icon: ICON.ball }] : []),
   { id: 'me', label: 'Meine Spiele', href: '/meine-spiele', icon: ICON.user },
-  { id: 'settings', label: 'Einstellungen', href: '/einstellungen', icon: ICON.gear },
+  { id: 'settings', label: 'Einstellungen', href: '/einstellungen', icon: ICON.cog },
 ];
 ---
 
@@ -49,7 +57,7 @@ const tabs = [
 
         {season && (
           <span class="season-pick">
-            <span class="season-pill">● Saison {season.jahr}</span>
+            <span class="season-pill">Saison {season.jahr}</span>
             {seasons.length > 1 && (
               <select aria-label="Saison wählen" onchange="if(this.value)window.location.href='/konkurrenzen?saison='+this.value">
                 {seasons.map((s) => <option value={s.jahr} selected={s.id === season.id}>{s.jahr}{s.status === 'archiviert' ? ' (Archiv)' : ''}</option>)}
@@ -60,7 +68,7 @@ const tabs = [
 
         {user ? (
           <details class="menu">
-            <summary class="icon-btn" aria-label="Menü" set:html={ICON.dots} />
+            <summary aria-label="Menü"><span class="avatar">{initials}</span></summary>
             <div class="menu-pop">
               <a href="/meine-spiele">Meine Spiele</a>
               {user.role === 'admin' && <a href="/admin">Admin</a>}

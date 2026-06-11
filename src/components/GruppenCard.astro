@@ -27,9 +27,12 @@ const TEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-w
 
 <div class="card fade-in">
   <div class="card-head">
-    <span class="grp-no">{index + 1}</span>
-    <span class="ttl">Gruppe {gruppe}</span>
-    <span class="sub">{standings.length} Spieler</span>
+    <span class="grp-no">{gruppe}</span>
+    <span style="flex:1;min-width:0">
+      <span class="ttl" style="display:block">Gruppe {gruppe}</span>
+      <span style="display:block;font-size:.72rem;color:var(--muted);font-weight:500">{standings.length} Spieler</span>
+    </span>
+    <span class="sub">{played}/{matches.length}</span>
   </div>
   <table class="standings">
     <thead><tr>

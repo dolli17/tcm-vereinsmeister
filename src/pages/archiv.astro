@@ -38,7 +38,7 @@ const entries = archived.map((s) => ({ season: s, honours: getSeasonHonours(s.id
                     <span style="display:flex;gap:10px;flex-wrap:wrap">
                       {h.winners.map((w) => (
                         <span style="font-size:.88rem">
-                          🏆 <a href={`/spieler/${slugifyPlayer(w.name.split(' / ')[0])}`} style="color:inherit;font-weight:600">{w.name}</a>
+                          <a href={`/spieler/${slugifyPlayer(w.name.split(' / ')[0])}`} style="color:inherit;font-weight:600">{w.name}</a>
                           {h.winners.length > 1 && <span style="color:var(--muted);font-size:.74rem"> ({w.label})</span>}
                         </span>
                       ))}
