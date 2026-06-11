@@ -44,11 +44,7 @@ const tabs = [
     <header class="topbar">
       <div class="topbar-row">
         <a href="/" class="brand" style="text-decoration:none;color:inherit">
-          <img class="brand-logo" src="/tcm-logo.png" alt="TC Muckensturm" />
-          <div class="brand-text">
-            <div class="brand-club">TC Muckensturm</div>
-            <div class="brand-title">Vereinsmeisterschaft</div>
-          </div>
+          <img class="brand-logo" src="/tcm-logo.png" alt="TC Muckensturm — Vereinsmeisterschaft" />
         </a>
 
         {season && (
@@ -96,7 +92,7 @@ const tabs = [
       {tabs.map((t) => (
         <a href={t.href} data-on={active === t.id ? '1' : '0'} style="text-decoration:none">
           <span class="ic-pill" set:html={t.icon} />
-          {t.label}
+          <span class="tab-lbl">{t.label}</span>
         </a>
       ))}
     </nav>

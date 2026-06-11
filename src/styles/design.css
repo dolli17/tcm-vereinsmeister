@@ -163,9 +163,6 @@ h1,h2,h3,h4 { font-family: var(--font-head); font-weight: var(--head-weight); le
   position: relative; overflow: hidden;
 }
 .brand-mark svg { width: 22px; height: 22px; }
-.brand-text { min-width: 0; }
-.brand-club { font-size: .72rem; color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.brand-title { font-family: var(--font-head); font-weight: var(--head-weight); font-size: 1.02rem; letter-spacing: var(--head-spacing); text-transform: var(--head-transform); line-height: 1; margin-top: 2px; }
 .icon-btn {
   width: 40px; height: 40px; border-radius: var(--r-md);
   display: grid; place-items: center; flex-shrink: 0;
@@ -616,12 +613,19 @@ h1,h2,h3,h4 { font-family: var(--font-head); font-weight: var(--head-weight); le
 
 /* Bottom-Nav als Links (statt buttons) */
 .tabbar a {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 6px 4px; color: var(--muted); font-size: .68rem; font-weight: 600;
   border-radius: var(--r-md);
 }
 .tabbar a svg { width: 22px; height: 22px; }
+.tabbar .tab-lbl { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tabbar .ic-pill { padding: 3px 16px; border-radius: var(--r-sm); transition: background .14s ease; }
+/* 6 Tabs müssen auch auf schmalen Handys ohne horizontales Scrollen passen. */
+@media (max-width: 460px) {
+  .tabbar { padding-left: 6px; padding-right: 6px; }
+  .tabbar a { font-size: .56rem; padding: 6px 1px; }
+  .tabbar .ic-pill { padding: 3px 8px; }
+}
 .tabbar a[data-on="1"] { color: var(--ink); }
 .tabbar a[data-on="1"] .ic-pill { background: var(--lime); }
 
