@@ -102,7 +102,7 @@ const errMsg: Record<string, string> = {
 
 <AppShell active="ladder" season={season} seasons={seasons} title="Forderungsliste · TC Muckensturm">
   <div class="section-title">Forderungsliste</div>
-  <div class="section-sub">Tannenbaum-System: fordere Spieler links in deiner Reihe oder in der Reihe darüber. Sieg = du übernimmst den Platz. <a href="/regeln" style="color:var(--accent);font-weight:700">Regeln</a></div>
+  <div class="section-sub">Tannenbaum-System: fordere Spieler links in deiner Reihe oder in der Reihe darüber. Sieg = du übernimmst den Platz. <a href="/regeln#forderung" style="color:var(--accent);font-weight:700">Regeln</a></div>
 
   <div class="section">
     {ok && okMsg[ok] && <div class="notice ok">{okMsg[ok]}</div>}
@@ -269,6 +269,10 @@ const errMsg: Record<string, string> = {
       </div>
     ))}
   </div>
+
+  <p class="section-sub" style="text-align:center;padding:18px 0 8px;display:flex;gap:18px;justify-content:center;flex-wrap:wrap">
+    <a href="/regeln#forderung" style="color:var(--accent);font-weight:700;text-decoration:none">📖 Forderungs-Regeln</a>
+  </p>
 </AppShell>
 
 <script>

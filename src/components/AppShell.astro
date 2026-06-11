@@ -21,18 +21,21 @@ const ICON = {
   trophy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 4h12v3a6 6 0 0 1-12 0V4z"/><path d="M6 5H3v2a3 3 0 0 0 3 3M18 5h3v2a3 3 0 0 1-3 3M9 14v3M15 14v3M8 20h8"/></svg>',
   swords: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 4l9 9M4 4h4M4 4v4M20 4l-9 9M20 4h-4M20 4v4M7 17l-3 3M17 17l3 3M6 14l4 4M18 14l-4 4"/></svg>',
   user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>',
-  book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M4 19a2 2 0 0 1 2-2h12"/></svg>',
   login: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>',
   dots: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
   home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-8 9 8"/><path d="M5 9v11h5v-6h4v6h5V9"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1"/></svg>',
+  spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2L5 14h6l-1 8 9-13h-6l0-7z"/></svg>',
 };
 
 const tabs = [
   { id: 'home', label: 'Start', href: '/', icon: ICON.home },
   { id: 'comp', label: 'Wettbewerbe', href: '/konkurrenzen', icon: ICON.trophy },
   { id: 'ladder', label: 'Forderung', href: '/forderung', icon: ICON.swords },
+  // Casual nur für Accounts mit Zugriff (Flag oder Admin) — versteckter Bereich.
+  ...(hasCasualAccess(user) ? [{ id: 'casual', label: 'Casual', href: '/casual', icon: ICON.spark }] : []),
   { id: 'me', label: 'Meine Spiele', href: '/meine-spiele', icon: ICON.user },
-  { id: 'rules', label: 'Regeln', href: '/regeln', icon: ICON.book },
+  { id: 'settings', label: 'Einstellungen', href: '/einstellungen', icon: ICON.gear },
 ];
 ---
 
@@ -64,8 +67,6 @@ const tabs = [
             <summary class="icon-btn" aria-label="Menü" set:html={ICON.dots} />
             <div class="menu-pop">
               <a href="/meine-spiele">Meine Spiele</a>
-              <a href="/einstellungen">Einstellungen</a>
-              {hasCasualAccess(user) && <a href="/casual">Casual</a>}
               {user.role === 'admin' && <a href="/admin">Admin</a>}
               <div class="sep"></div>
               <form method="POST" action="/api/auth/logout"><button type="submit">Abmelden</button></form>
