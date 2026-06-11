@@ -1,5 +1,6 @@
 ---
 import AppShell from '../components/AppShell.astro';
+import ScorePicker from '../components/ScorePicker.astro';
 import { getActiveSeason, listSeasons } from '../lib/tournament';
 import {
   LISTEN,
@@ -144,27 +145,26 @@ const errMsg: Record<string, string> = {
                 <label style="display:block"><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">Termin {c.termin ? 'ändern' : 'festhalten'}</span><input class="input" style="min-height:36px" type="datetime-local" name="termin" /></label>
                 <button class="btn sm ghost">Speichern</button>
               </form>
-              <form method="POST" action="/api/ladder" style="margin-top:10px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap" data-entry>
+              <form method="POST" action="/api/ladder" style="margin-top:10px;display:grid;gap:10px" data-entry>
                 <input type="hidden" name="action" value="enter" />
                 <input type="hidden" name="challenge_id" value={c.id} />
-                <label style="display:block"><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">Typ</span>
-                  <select class="input" name="ergebnis_typ" style="min-height:36px" data-typ>
-                    <option value="gespielt">Gespielt</option>
-                    <option value="wo">Kampflos (w.o.)</option>
-                    <option value="aufgabe">Aufgabe</option>
-                  </select>
-                </label>
-                <label style="display:block" data-sets><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">Satz 1</span><input class="score-in" name="satz1" placeholder="6:3" inputmode="numeric" /></label>
-                <label style="display:block" data-sets><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">Satz 2</span><input class="score-in" name="satz2" placeholder="6:4" inputmode="numeric" /></label>
-                <label style="display:block" data-sets><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">MTB</span><input class="score-in" name="mtb" placeholder="10:7" inputmode="numeric" /></label>
-                <label style="display:none" data-winner><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">Sieger</span>
-                  <select class="input" name="sieger_rel" style="min-height:36px">
-                    <option value="me">Ich</option>
-                    <option value="opp">{gegner}</option>
-                  </select>
-                </label>
-                <button type="submit" class="btn sm">Ergebnis eintragen</button>
-                <span style="flex-basis:100%;font-size:.68rem;color:var(--muted)">Sätze aus deiner Sicht (6:3 = du führst).</span>
+                <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+                  <label style="display:block"><span class="pick-lbl">Typ</span>
+                    <select class="input" name="ergebnis_typ" style="min-height:42px" data-typ>
+                      <option value="gespielt">Gespielt</option>
+                      <option value="wo">Kampflos (w.o.)</option>
+                      <option value="aufgabe">Aufgabe</option>
+                    </select>
+                  </label>
+                  <label style="display:none" data-winner><span class="pick-lbl">Sieger</span>
+                    <select class="input" name="sieger_rel" style="min-height:42px">
+                      <option value="me">Ich</option>
+                      <option value="opp">{gegner}</option>
+                    </select>
+                  </label>
+                </div>
+                <ScorePicker gegner={gegner.split(' ')[0]} />
+                <div><button type="submit" class="btn sm">Ergebnis eintragen</button></div>
               </form>
               {ichForderer && (
                 <form method="POST" action="/api/ladder" style="margin-top:10px" onsubmit="return confirm('Forderung wirklich zurückziehen?')">
@@ -284,16 +284,5 @@ const errMsg: Record<string, string> = {
     panels.forEach((p) => { p.hidden = p.dataset.panel !== chip.dataset.disc; });
   }));
 
-  // Ergebnistyp-Umschalter (wie in "Meine Spiele")
-  document.querySelectorAll<HTMLFormElement>('[data-entry]').forEach((form) => {
-    const typ = form.querySelector<HTMLSelectElement>('[data-typ]');
-    if (!typ) return;
-    const apply = () => {
-      const t = typ.value;
-      form.querySelectorAll<HTMLElement>('[data-sets]').forEach((el) => { el.style.display = t === 'wo' ? 'none' : 'block'; });
-      form.querySelectorAll<HTMLElement>('[data-winner]').forEach((el) => { el.style.display = t === 'gespielt' ? 'none' : 'block'; });
-    };
-    typ.addEventListener('change', apply);
-    apply();
-  });
+  // Eintragungs-Logik (Satz-Picker, MTB bei 1:1, wo/aufgabe) liegt in ScorePicker.astro.
 </script>

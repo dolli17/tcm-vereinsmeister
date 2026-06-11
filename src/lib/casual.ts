@@ -2,6 +2,7 @@
 // die kombinierte Bilanz zweier Personen (Casual + bestätigte VM-Duelle aller Saisons).
 import { getDb } from './db';
 import { teamPlayers } from './tournament';
+import { normalizeSetInput } from './matchEntry';
 
 export type CasualMatch = {
   id: number;
@@ -18,8 +19,9 @@ export type CasualMatch = {
 };
 
 function parseSet(s: string | null | undefined): { a: number; b: number } | null {
-  if (!s) return null;
-  const m = String(s).trim().match(/^(\d+)\s*[:\-]\s*(\d+)$/);
+  const norm = normalizeSetInput(s);
+  if (!norm) return null;
+  const m = norm.match(/^(\d+):(\d+)$/);
   if (!m) return null;
   return { a: parseInt(m[1], 10), b: parseInt(m[2], 10) };
 }

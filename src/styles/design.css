@@ -837,3 +837,9 @@ h1,h2,h3,h4 { font-family: var(--font-head); font-weight: var(--head-weight); le
 }
 .switch input:checked + .knob { background: var(--blue); border-color: var(--blue); }
 .switch input:checked + .knob::after { transform: translateX(20px); }
+
+/* ---------- Satz-Eingabe per Klick (ScorePicker) ---------- */
+.pick-lbl { display: block; font-size: .7rem; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.pickrow { display: flex; align-items: center; gap: 7px; }
+.pickrow .setpick { width: 66px; min-height: 42px; text-align: center; font-family: var(--font-head); font-weight: 700; }
+.pick-colon { font-weight: 700; color: var(--muted); }

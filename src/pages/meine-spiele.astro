@@ -1,5 +1,6 @@
 ---
 import AppShell from '../components/AppShell.astro';
+import ScorePicker from '../components/ScorePicker.astro';
 import { getActiveSeason, listSeasons } from '../lib/tournament';
 import { getPlayerMatches, type PlayerMatch } from '../lib/matchEntry';
 import { getAllPlayerNames, slugifyPlayer } from '../lib/playerStats';
@@ -190,26 +191,25 @@ const I_CAL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
                   );
                 })()}
                 {m.canEnter && (
-                  <form method="POST" action="/api/results" style="margin-top:10px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap" data-entry>
+                  <form method="POST" action="/api/results" style="margin-top:10px;display:grid;gap:10px" data-entry>
                     <input type="hidden" name="match_id" value={m.matchId} />
-                    <label style="display:block"><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">Typ</span>
-                      <select class="input" name="ergebnis_typ" style="min-height:36px" data-typ>
-                        <option value="gespielt">Gespielt</option>
-                        <option value="wo">Kampflos (w.o.)</option>
-                        <option value="aufgabe">Aufgabe</option>
-                      </select>
-                    </label>
-                    <label style="display:block" data-sets><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">Satz 1</span><input class="score-in" name="satz1" placeholder="6:3" inputmode="numeric" /></label>
-                    <label style="display:block" data-sets><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">Satz 2</span><input class="score-in" name="satz2" placeholder="6:4" inputmode="numeric" /></label>
-                    <label style="display:block" data-sets><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">MTB</span><input class="score-in" name="mtb" placeholder="10:7" inputmode="numeric" /></label>
-                    <label style="display:none" data-winner><span style="font-size:.66rem;color:var(--muted);display:block;margin-bottom:3px">Sieger</span>
-                      <select class="input" name="sieger_rel" style="min-height:36px">
-                        <option value="me">{m.partner.length > 0 ? 'Wir' : 'Ich'}</option>
-                        <option value="opp">{m.gegner.join(' / ')}</option>
-                      </select>
-                    </label>
-                    <button type="submit" class="btn sm">Eintragen</button>
-                    <span style="flex-basis:100%;font-size:.68rem;color:var(--muted)">Sätze aus deiner Sicht (6:3 = du führst).</span>
+                    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+                      <label style="display:block"><span class="pick-lbl">Typ</span>
+                        <select class="input" name="ergebnis_typ" style="min-height:42px" data-typ>
+                          <option value="gespielt">Gespielt</option>
+                          <option value="wo">Kampflos (w.o.)</option>
+                          <option value="aufgabe">Aufgabe</option>
+                        </select>
+                      </label>
+                      <label style="display:none" data-winner><span class="pick-lbl">Sieger</span>
+                        <select class="input" name="sieger_rel" style="min-height:42px">
+                          <option value="me">{m.partner.length > 0 ? 'Wir' : 'Ich'}</option>
+                          <option value="opp">{m.gegner.join(' / ')}</option>
+                        </select>
+                      </label>
+                    </div>
+                    <ScorePicker gegner={m.gegner.length === 1 ? m.gegner[0].split(' ')[0] : 'Gegner'} />
+                    <div><button type="submit" class="btn sm">Ergebnis eintragen</button></div>
                   </form>
                 )}
                 {m.status === 'pending' && m.canDecide && (
@@ -248,23 +248,7 @@ const I_CAL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
   )}
 </AppShell>
 
-{user && (
-  <script>
-    // Eintragungsformulare: bei Kampflos die Satz-Felder ausblenden, bei
-    // Kampflos/Aufgabe die Sieger-Auswahl einblenden.
-    document.querySelectorAll<HTMLFormElement>('[data-entry]').forEach((form) => {
-      const typ = form.querySelector<HTMLSelectElement>('[data-typ]');
-      if (!typ) return;
-      const apply = () => {
-        const t = typ.value;
-        form.querySelectorAll<HTMLElement>('[data-sets]').forEach((el) => { el.style.display = t === 'wo' ? 'none' : 'block'; });
-        form.querySelectorAll<HTMLElement>('[data-winner]').forEach((el) => { el.style.display = t === 'gespielt' ? 'none' : 'block'; });
-      };
-      typ.addEventListener('change', apply);
-      apply();
-    });
-  </script>
-)}
+{/* Eintragungs-Logik (Satz-Picker, MTB bei 1:1, wo/aufgabe-Umschaltung) liegt in ScorePicker.astro */}
 
 {!user && (
   <script define:vars={{ players }}>

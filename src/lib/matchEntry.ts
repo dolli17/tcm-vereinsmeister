@@ -332,8 +332,33 @@ export function adminDeleteResult(
 }
 
 // ── Score-Validierung ──────────────────────────────────────────────────────
+// Tolerante Normalisierung von Satz-Eingaben: am Handy fehlt auf der
+// Zifferntastatur der Doppelpunkt. Akzeptiert werden alternative Trenner
+// (- . , ; Leerzeichen) sowie reine Ziffernfolgen, sofern eindeutig:
+// "63"→6:3, "107"→10:7, "712"→7:12, "1210"→12:10. Liefert "a:b" oder null.
+export function normalizeSetInput(raw: string | null | undefined): string | null {
+  const t = (raw ?? '').trim();
+  if (!t) return null;
+  const sep = t.match(/^(\d+)\s*[:\-.,;\s]\s*(\d+)$/);
+  if (sep) return `${parseInt(sep[1], 10)}:${parseInt(sep[2], 10)}`;
+  if (/^\d+$/.test(t)) {
+    if (t.length === 2) return `${t[0]}:${t[1]}`;
+    if (t.length === 3) {
+      const ab = parseInt(t.slice(0, 2), 10);
+      const bc = parseInt(t.slice(1), 10);
+      if (ab >= 10) return `${ab}:${t[2]}`;
+      if (bc >= 10) return `${t[0]}:${bc}`;
+      return null;
+    }
+    if (t.length === 4) return `${parseInt(t.slice(0, 2), 10)}:${parseInt(t.slice(2), 10)}`;
+  }
+  return null;
+}
+
 function parseSet(s: string): { a: number; b: number } | null {
-  const m = s.trim().match(/^(\d+)\s*[:\-]\s*(\d+)$/);
+  const norm = normalizeSetInput(s);
+  if (!norm) return null;
+  const m = norm.match(/^(\d+):(\d+)$/);
   if (!m) return null;
   return { a: parseInt(m[1], 10), b: parseInt(m[2], 10) };
 }
@@ -350,8 +375,10 @@ export type EntryInput = { typ: string; satz1?: string | null; satz2?: string | 
 export function flipSet(s: string | null | undefined): string | null {
   const t = (s ?? '').trim();
   if (!t) return null;
-  const m = t.match(/^(\d+)\s*[:\-]\s*(\d+)$/);
-  return m ? `${m[2]}:${m[1]}` : t; // Unlesbares unverändert lassen — validateEntry meldet den Fehler
+  const norm = normalizeSetInput(t);
+  if (!norm) return t; // Unlesbares unverändert lassen — validateEntry meldet den Fehler
+  const m = norm.match(/^(\d+):(\d+)$/)!;
+  return `${m[2]}:${m[1]}`;
 }
 
 export function validateEntry(input: EntryInput): { ok: true; score: EntryScore } | { ok: false; error: string } {
